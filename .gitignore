@@ -1,0 +1,29 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Outputs and saved models
+outputs/
+*.joblib
+*.pkl
+*.pt
+*.h5
+
+# Large datasets
+*.csv
+*.xlsx
+*.zip
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
