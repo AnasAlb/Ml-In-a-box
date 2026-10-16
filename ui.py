@@ -1,228 +1,690 @@
 """
-Shared UI helpers: palette, cards, hero, stat boxes, deployment lock,
-watermark, Sisyphus quote, glossary.
+Shared UI helpers: theme, cards, hero, stat boxes, 3D robot, Byte (Wall-E
+modal assistant), watermark, Sisyphus, glossary.
 """
 import os
+import textwrap
 import streamlit as st
 
 
-THEME = """
-<style>
-    .stApp {
-        background:
-            radial-gradient(1400px 900px at 15% -10%, rgba(34,211,238,0.09), transparent 60%),
-            radial-gradient(1200px 800px at 105% 5%, rgba(232,121,249,0.08), transparent 55%),
-            #0a0d1a;
+# ============================================================
+# THEME PALETTES
+# ============================================================
+def _palette(theme: str) -> dict:
+    if theme == "light":
+        return {
+            "bg": "#F9FAFB", "bg_soft": "#FFFFFF", "card_bg": "#FFFFFF",
+            "border": "#E5E7EB", "border_accent": "#D4AF37",
+            "accent": "#34D399", "accent_soft": "rgba(52, 211, 153, 0.1)",
+            "accent_text": "#059669", "accent_2": "#D4AF37",
+            "text": "#111827", "text_muted": "#6B7280", "text_dim": "#9CA3AF",
+            "shadow_sm": "0 4px 15px rgba(212, 175, 55, 0.08)",
+            "shadow_md": "0 10px 30px -10px rgba(212, 175, 55, 0.2)",
+            "glow": "rgba(52, 211, 153, 0.25)",
+            "glow_2": "rgba(212, 175, 55, 0.25)",
+            "button_primary_bg": "#D4AF37", "button_primary_text": "#FFFFFF",
+            "button_primary_hover": "#B8860B",
+            "button_secondary_bg": "#FFFFFF", "button_secondary_text": "#4B5563",
+            "button_secondary_border": "#E5E7EB",
+            "btn_secondary_hover_bg": "#ECFDF5",
+            "btn_secondary_hover_text": "#059669",
+            "btn_secondary_hover_border": "#34D399",
+            "pill_bg": "rgba(52, 211, 153, 0.1)", "pill_text": "#059669",
+            "pill_border": "rgba(52, 211, 153, 0.35)",
+            "pill_purple_bg": "rgba(212, 175, 55, 0.1)",
+            "pill_purple_text": "#B8860B",
+            "pill_purple_border": "rgba(212, 175, 55, 0.35)",
+            "pill_amber_bg": "rgba(251, 191, 36, 0.15)",
+            "pill_amber_text": "#D97706",
+            "pill_amber_border": "rgba(251, 191, 36, 0.4)",
+            "pill_red_bg": "rgba(239, 68, 68, 0.1)", "pill_red_text": "#DC2626",
+            "pill_red_border": "rgba(239, 68, 68, 0.3)",
+            "input_bg": "#FFFFFF", "input_text": "#111827",
+            "input_border": "#E5E7EB", "input_placeholder": "#9CA3AF",
+            "robot_bg": "#FFFFFF", "robot_border": "#D4AF37",
+            "robot_eye": "#34D399", "robot_eye_glow": "rgba(52, 211, 153, 0.85)",
+            "robot_body": "#F3F4F6",
+            "progress_grad": "linear-gradient(90deg, #34D399, #D4AF37)",
+        }
+    return {
+        "bg": "#050505", "bg_soft": "#0A0A0A", "card_bg": "#111111",
+        "border": "#27272A", "border_accent": "#00F0FF",
+        "accent": "#00F0FF", "accent_soft": "rgba(0, 240, 255, 0.1)",
+        "accent_text": "#00F0FF", "accent_2": "#A855F7",
+        "text": "#FFFFFF", "text_muted": "#A1A1AA", "text_dim": "#52525B",
+        "shadow_sm": "0 4px 20px rgba(0, 0, 0, 0.5)",
+        "shadow_md": "0 10px 30px -10px rgba(0, 240, 255, 0.3)",
+        "glow": "rgba(0, 240, 255, 0.3)",
+        "glow_2": "rgba(168, 85, 247, 0.3)",
+        "button_primary_bg": "#00F0FF", "button_primary_text": "#050505",
+        "button_primary_hover": "#00D0E0",
+        "button_secondary_bg": "#18181B", "button_secondary_text": "#FFFFFF",
+        "button_secondary_border": "#27272A",
+        "btn_secondary_hover_bg": "rgba(0, 240, 255, 0.05)",
+        "btn_secondary_hover_text": "#00F0FF",
+        "btn_secondary_hover_border": "#00F0FF",
+        "pill_bg": "rgba(0, 240, 255, 0.1)", "pill_text": "#00F0FF",
+        "pill_border": "rgba(0, 240, 255, 0.3)",
+        "pill_purple_bg": "rgba(168, 85, 247, 0.1)",
+        "pill_purple_text": "#C084FC",
+        "pill_purple_border": "rgba(168, 85, 247, 0.3)",
+        "pill_amber_bg": "rgba(251, 191, 36, 0.1)",
+        "pill_amber_text": "#FCD34D",
+        "pill_amber_border": "rgba(251, 191, 36, 0.3)",
+        "pill_red_bg": "rgba(244, 63, 94, 0.1)", "pill_red_text": "#FB7185",
+        "pill_red_border": "rgba(244, 63, 94, 0.3)",
+        "input_bg": "#0F0F0F", "input_text": "#FFFFFF",
+        "input_border": "#27272A", "input_placeholder": "#52525B",
+        "robot_bg": "#18181B", "robot_border": "#00F0FF",
+        "robot_eye": "#00F0FF", "robot_eye_glow": "rgba(0, 240, 255, 0.9)",
+        "robot_body": "#09090B",
+        "progress_grad": "linear-gradient(90deg, #00F0FF, #A855F7)",
     }
-    .block-container { padding-top: 7rem; padding-bottom: 5rem; max-width: 1400px; }
-    h1, h2, h3, h4 { letter-spacing: -0.02em; color: #e8eef7; }
 
-    /* ---------- hero ---------- */
-    .hero {
-        padding: 3.4rem 2.8rem 3.6rem 2.8rem;
-        border-radius: 24px;
-        background: linear-gradient(135deg, rgba(34,211,238,0.10), rgba(232,121,249,0.10));
-        border: 1px solid rgba(34,211,238,0.22);
-        margin-bottom: 2rem;
+
+# ============================================================
+# THEME BUILDER
+# ============================================================
+def _build_theme(p: dict) -> str:
+    return f"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    header[data-testid="stHeader"] {{ display: none !important; }}
+    #MainMenu {{ visibility: hidden; }}
+    footer {{ visibility: hidden; }}
+
+    * {{ transition: background-color 0.5s ease, color 0.5s ease,
+                       border-color 0.5s ease, box-shadow 0.5s ease; }}
+
+    .stApp {{
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: {p['bg']};
+    }}
+
+    .block-container {{
+        padding-top: 7rem !important;
+        padding-bottom: 5rem;
+        max-width: 1400px;
+    }}
+
+    h1, h2, h3, h4 {{
+        letter-spacing: -0.03em;
+        color: {p['text']};
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800;
+    }}
+
+    p, span, div {{ color: {p['text_muted']}; }}
+
+    /* ---------- INPUT STYLING ---------- */
+    .stTextInput input,
+    .stNumberInput input,
+    .stTextArea textarea {{
+        background-color: {p['input_bg']} !important;
+        color: {p['input_text']} !important;
+        border: 1px solid {p['input_border']} !important;
+        border-radius: 10px !important;
+    }}
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {{
+        color: {p['input_placeholder']} !important;
+        opacity: 1 !important;
+    }}
+    .stTextInput input:focus,
+    .stTextArea textarea:focus,
+    .stNumberInput input:focus {{
+        border-color: {p['accent']} !important;
+        box-shadow: 0 0 0 3px {p['accent_soft']} !important;
+    }}
+    .stTextInput label,
+    .stTextArea label,
+    .stNumberInput label,
+    .stSelectbox label,
+    .stMultiSelect label,
+    .stRadio label,
+    .stCheckbox label {{
+        color: {p['text_muted']} !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+    }}
+
+    /* Selectbox */
+    .stSelectbox div[data-baseweb="select"] > div {{
+        background-color: {p['input_bg']} !important;
+        color: {p['input_text']} !important;
+        border-color: {p['input_border']} !important;
+    }}
+    .stSelectbox div[data-baseweb="select"] svg {{
+        fill: {p['text_muted']} !important;
+    }}
+
+    /* Multiselect */
+    .stMultiSelect div[data-baseweb="select"] > div {{
+        background-color: {p['input_bg']} !important;
+        border-color: {p['input_border']} !important;
+    }}
+    .stMultiSelect span[data-baseweb="tag"] {{
+        background-color: {p['accent_soft']} !important;
+        color: {p['accent_text']} !important;
+    }}
+
+    /* Number input +/- buttons */
+    .stNumberInput button {{
+        background-color: {p['card_bg']} !important;
+        color: {p['text_muted']} !important;
+        border-color: {p['input_border']} !important;
+    }}
+
+    /* ---------- HERO ---------- */
+    .hero {{
+        padding: 4rem 3rem;
+        border-radius: 32px;
+        background: {p['bg_soft']};
+        border: 1px solid {p['border_accent']};
+        box-shadow: {p['shadow_md']};
+        margin-bottom: 3rem;
         position: relative;
         overflow: hidden;
-        box-shadow: 0 20px 60px rgba(34,211,238,0.06);
-        min-height: 220px;
-    }
-    .hero::before {
-        content: ""; position: absolute; top: -60%; right: -15%;
-        width: 620px; height: 620px;
-        background: radial-gradient(circle, rgba(34,211,238,0.22), transparent 70%);
+    }}
+    .hero::before {{
+        content: ""; position: absolute; top: -50%; right: -10%;
+        width: 600px; height: 600px;
+        background: radial-gradient(circle, {p['glow']}, transparent 70%);
         border-radius: 50%; pointer-events: none;
-    }
-    .hero::after {
-        content: ""; position: absolute; bottom: -70%; left: -15%;
-        width: 540px; height: 540px;
-        background: radial-gradient(circle, rgba(232,121,249,0.16), transparent 70%);
+    }}
+    .hero::after {{
+        content: ""; position: absolute; bottom: -40%; left: -10%;
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, {p['glow_2']}, transparent 70%);
         border-radius: 50%; pointer-events: none;
-    }
-    .hero h1 {
-        font-size: 3rem;
-        margin: 0;
-        padding-bottom: 6px;
-        background: linear-gradient(135deg, #67e8f9 0%, #22d3ee 40%, #e879f9 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
+    }}
+    .hero h1 {{
+        font-size: 4rem; margin: 0; padding-bottom: 8px;
+        background: linear-gradient(135deg, {p['text']} 0%, {p['accent']} 100%);
+        -webkit-background-clip: text; background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-weight: 800;
-        line-height: 1.15;
+        line-height: 1.1; position: relative; z-index: 1;
+    }}
+    .hero p {{
+        font-size: 1.2rem; color: {p['text_muted']};
+        margin: 1rem 0 1.5rem 0; max-width: 700px;
+        position: relative; z-index: 1; line-height: 1.6;
+    }}
+
+    /* ---------- CARDS ---------- */
+    .card {{
+        background: {p['card_bg']};
+        border: 1px solid {p['border']};
+        border-radius: 20px;
+        padding: 1.8rem; margin-bottom: 1.5rem;
+        box-shadow: {p['shadow_sm']};
         position: relative;
-        z-index: 1;
-        display: inline-block;
-    }
-    .hero p {
-        font-size: 1.12rem; color: #b6c2d4;
-        margin: 1rem 0 1.2rem 0; max-width: 760px;
-        position: relative; z-index: 1;
-    }
+        overflow: hidden;
+    }}
+    .card:hover {{
+        border-color: {p['accent']};
+        box-shadow: {p['shadow_md']};
+    }}
+    .card h4 {{ margin: 0 0 0.6rem 0; color: {p['text']};
+                font-size: 1.05rem; font-weight: 700; }}
+    .card p {{ margin: 0; color: {p['text_muted']};
+               font-size: 0.95rem; line-height: 1.6; }}
 
-    .prose { max-width: 780px; color: #cfd8e3; font-size: 1.05rem; line-height: 1.7; }
-    .prose h3 { margin-top: 1.8rem; margin-bottom: 0.4rem; color: #67e8f9;
-                font-size: 1.15rem; font-weight: 700; }
-    .prose p { margin: 0 0 1rem 0; }
-    .prose strong { color: #e8eef7; }
+    /* ---------- PILLS ---------- */
+    .pill {{
+        display: inline-block; padding: 6px 16px; border-radius: 30px;
+        background: {p['pill_bg']}; color: {p['pill_text']};
+        font-size: 0.75rem; font-weight: 700;
+        margin-right: 8px; margin-bottom: 8px;
+        border: 1px solid {p['pill_border']};
+    }}
+    .pill.purple {{ background: {p['pill_purple_bg']};
+                    color: {p['pill_purple_text']};
+                    border-color: {p['pill_purple_border']}; }}
+    .pill.amber  {{ background: {p['pill_amber_bg']};
+                    color: {p['pill_amber_text']};
+                    border-color: {p['pill_amber_border']}; }}
+    .pill.red    {{ background: {p['pill_red_bg']};
+                    color: {p['pill_red_text']};
+                    border-color: {p['pill_red_border']}; }}
 
-    .card {
-        background: linear-gradient(180deg, #131a2e 0%, #10172a 100%);
-        border: 1px solid #2a3350; border-radius: 16px;
-        padding: 1.3rem 1.5rem; margin-bottom: 1rem;
-        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-    }
-    .card:hover {
-        border-color: rgba(34,211,238,0.6);
-        transform: translateY(-2px);
-        box-shadow: 0 12px 32px rgba(34,211,238,0.14), 0 0 0 1px rgba(34,211,238,0.15);
-    }
-    .card h4 { margin: 0 0 0.5rem 0; color: #67e8f9; font-size: 1rem; font-weight: 600; }
-    .card p { margin: 0; color: #b6c2d4; font-size: 0.93rem; line-height: 1.5; }
-    .card .icon { font-size: 1.7rem; margin-bottom: 0.5rem; display: block; }
+    /* ---------- STATS ---------- */
+    .stat {{
+        padding: 1.5rem; border-radius: 20px;
+        background: {p['card_bg']}; border: 1px solid {p['border']};
+        box-shadow: {p['shadow_sm']}; text-align: center;
+    }}
+    .stat .num {{ font-size: 2.2rem; font-weight: 800;
+                  color: {p['accent']}; margin: 0; line-height: 1.1; }}
+    .stat .lbl {{ font-size: 0.75rem; color: {p['text_dim']};
+                  text-transform: uppercase; letter-spacing: 0.1em;
+                  margin-top: 0.5rem; font-weight: 700; }}
 
-    .pill {
-        display: inline-block; padding: 3px 12px; border-radius: 20px;
-        background: rgba(34,211,238,0.14); color: #67e8f9;
-        font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em;
-        margin-right: 6px; margin-bottom: 6px; text-transform: uppercase;
-    }
-    .pill.purple { background: rgba(232,121,249,0.16); color: #f0a6fc; }
-    .pill.amber  { background: rgba(251,191,36,0.16);  color: #fcd34d; }
-    .pill.red    { background: rgba(244,63,94,0.16);   color: #fb7185; }
+    /* ---------- TRACE ---------- */
+    .trace {{
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem; color: {p['text_muted']};
+        padding: 6px 0 6px 12px;
+        border-left: 2px solid {p['accent']};
+        margin-bottom: 4px; background: {p['bg_soft']};
+        border-radius: 0 8px 8px 0;
+    }}
+    .trace::before {{ content: "› "; color: {p['accent']}; font-weight: bold; }}
 
-    .stat {
-        padding: 1.1rem 1.2rem; border-radius: 14px;
-        background: linear-gradient(135deg, rgba(34,211,238,0.07), rgba(232,121,249,0.07));
-        border: 1px solid #2a3350; text-align: center;
-    }
-    .stat .num { font-size: 1.9rem; font-weight: 800; color: #67e8f9; margin: 0; line-height: 1.1; }
-    .stat .lbl {
-        font-size: 0.72rem; color: #94a3b8;
-        text-transform: uppercase; letter-spacing: 0.09em;
-        margin-top: 0.35rem; font-weight: 600;
-    }
+    /* ---------- PROSE ---------- */
+    .prose {{ max-width: 820px; color: {p['text_muted']};
+              font-size: 1.02rem; line-height: 1.75; }}
+    .prose h3 {{ margin-top: 1.8rem; margin-bottom: 0.4rem;
+                 color: {p['accent']}; font-size: 1.15rem; font-weight: 700; }}
+    .prose p {{ margin: 0 0 1rem 0; }}
+    .prose strong {{ color: {p['text']}; }}
 
-    .trace {
-        font-family: Consolas, Menlo, monospace; font-size: 0.82rem;
-        color: #94a3b8; padding: 3px 0;
-        border-left: 2px solid rgba(34,211,238,0.35);
-        padding-left: 10px; margin-bottom: 3px;
-    }
-    .trace::before { content: "› "; color: #22d3ee; }
-
-    .deploy-locked { position: relative; overflow: hidden; border-radius: 16px; }
-    .deploy-locked .deploy-inner {
-        background: linear-gradient(180deg, #131a2e 0%, #10172a 100%);
-        border: 1px solid #2a3350; border-radius: 16px;
-        padding: 1.5rem 1.7rem;
-    }
-    .deploy-locked .deploy-inner h4 { color: #fcd34d; margin: 0 0 0.5rem 0; }
-    .deploy-locked .deploy-inner p { color: #94a3b8; margin: 0; font-size: 0.9rem; }
-    .deploy-locked .lock-overlay {
+    /* ---------- DEPLOYMENT LOCK ---------- */
+    .deploy-locked {{ position: relative; overflow: hidden; border-radius: 20px; }}
+    .deploy-locked .deploy-inner {{
+        background: {p['card_bg']}; border: 1px solid {p['border']};
+        border-radius: 20px; padding: 1.5rem 1.7rem;
+    }}
+    .deploy-locked .deploy-inner h4 {{ color: {p['pill_amber_text']}; margin: 0 0 0.5rem 0; }}
+    .deploy-locked .deploy-inner p {{ color: {p['text_muted']}; margin: 0; font-size: 0.9rem; }}
+    .deploy-locked .lock-overlay {{
         position: absolute; inset: 0;
         display: flex; align-items: center; justify-content: center;
         flex-direction: column; gap: 0.4rem;
-        background: rgba(10, 13, 26, 0.92);
-        opacity: 0; transition: opacity 0.28s ease;
-        border-radius: 16px; backdrop-filter: blur(4px);
+        background: {p['bg']}ee; opacity: 0;
+        transition: opacity 0.3s ease;
+        border-radius: 20px; backdrop-filter: blur(4px);
         pointer-events: none; z-index: 10;
-    }
-    .deploy-locked:hover .lock-overlay { opacity: 1; }
-    .deploy-locked .lock-overlay .lock-icon {
-        font-size: 2.4rem; filter: drop-shadow(0 0 12px rgba(251,191,36,0.55));
-    }
-    .deploy-locked .lock-overlay .lock-text {
-        color: #fcd34d; font-weight: 700; font-size: 1rem; letter-spacing: 0.03em;
-    }
-    .deploy-locked .lock-overlay .lock-sub {
-        color: #94a3b8; font-size: 0.82rem; max-width: 380px;
-        text-align: center; line-height: 1.4;
-    }
+    }}
+    .deploy-locked:hover .lock-overlay {{ opacity: 1; }}
+    .deploy-locked .lock-overlay .lock-icon {{ font-size: 2.4rem; }}
+    .deploy-locked .lock-overlay .lock-text {{ color: {p['pill_amber_text']};
+                                                 font-weight: 700; font-size: 1rem; }}
+    .deploy-locked .lock-overlay .lock-sub {{ color: {p['text_muted']};
+                                                font-size: 0.82rem;
+                                                max-width: 380px; text-align: center; }}
 
-    section[data-testid="stSidebar"] { background: #0c1224; border-right: 1px solid #1a2238; }
-    section[data-testid="stSidebar"] .stButton button {
-        text-align: left; justify-content: flex-start; width: 100%;
-        background: transparent; border: 1px solid transparent;
-        color: #cfd8e3; font-weight: 500;
-        transition: all 0.14s ease; padding: 0.55rem 0.9rem;
-    }
-    section[data-testid="stSidebar"] .stButton button:hover {
-        background: rgba(34,211,238,0.10);
-        border-color: rgba(34,211,238,0.35); color: #67e8f9;
-    }
-
-    .stButton button[kind="primary"] {
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        color: #1a1206; font-weight: 700; border: none;
-        box-shadow: 0 4px 14px rgba(251,191,36,0.25);
-    }
-    .stButton button[kind="primary"]:hover {
-        box-shadow: 0 8px 26px rgba(251,191,36,0.45);
+    /* ---------- BUTTONS ---------- */
+    .stButton button[kind="primary"] {{
+        background: {p['button_primary_bg']};
+        color: {p['button_primary_text']};
+        font-weight: 700; border: none;
+        box-shadow: 0 4px 14px {p['glow']};
+        border-radius: 12px; padding: 0.6rem 1.5rem;
+    }}
+    .stButton button[kind="primary"]:hover {{
+        background: {p['button_primary_hover']};
+        box-shadow: 0 6px 20px {p['glow']};
         transform: translateY(-1px);
-    }
-    .stButton button:not([kind="primary"]) {
-        background: #1c2540; color: #cfd8e3; border: 1px solid #2a3350;
-    }
-    .stButton button:not([kind="primary"]):hover {
-        border-color: rgba(34,211,238,0.55); color: #67e8f9;
-    }
+    }}
+    .stButton button:not([kind="primary"]) {{
+        background: {p['button_secondary_bg']};
+        color: {p['button_secondary_text']};
+        border: 1px solid {p['button_secondary_border']};
+        border-radius: 12px; padding: 0.6rem 1.5rem; font-weight: 600;
+    }}
+    .stButton button:not([kind="primary"]):hover {{
+        border-color: {p['btn_secondary_hover_border']};
+        color: {p['btn_secondary_hover_text']};
+        background: {p['btn_secondary_hover_bg']};
+    }}
 
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #22d3ee, #e879f9);
-    }
+    .stProgress > div > div > div div {{ background: {p['progress_grad']}; }}
+    hr {{ border-color: {p['border']}; }}
 
-    hr { border-color: #1a2238; }
-
-    /* ---------- watermark ---------- */
-    .wm {
+    /* ---------- WATERMARK ---------- */
+    .wm {{
         position: fixed; bottom: 0; left: 0; right: 0;
-        text-align: center; padding: 0.55rem 1rem;
-        background: linear-gradient(180deg, transparent, rgba(10,13,26,0.94) 40%);
-        color: #5c6a85;
-        font-size: 0.76rem; letter-spacing: 0.02em;
-        z-index: 9999; pointer-events: none;
-        backdrop-filter: blur(6px);
-    }
-    .wm b { color: #94a3b8; font-weight: 600; }
-    .wm .brand { color: #67e8f9; font-weight: 700; }
-    .wm .sep { opacity: 0.4; margin: 0 0.5rem; }
+        text-align: center; padding: 1rem;
+        background: linear-gradient(180deg, transparent, {p['bg']}dd 60%);
+        color: {p['text_dim']}; font-size: 0.8rem;
+        z-index: 900; pointer-events: none;
+    }}
+    .wm b {{ color: {p['text_muted']}; font-weight: 600; }}
+    .wm .brand {{ color: {p['accent']}; font-weight: 700; }}
+    .wm .sep {{ opacity: 0.5; margin: 0 0.5rem; }}
 
-    /* ---------- Sisyphus quote ---------- */
-    .sisyphus {
-        margin-top: 3rem;
-        margin-bottom: 1rem;
-        text-align: right;
-        color: #5c6a85;
-        font-style: italic;
-        font-size: 0.95rem;
-        letter-spacing: 0.02em;
-        opacity: 0.75;
-    }
-    .sisyphus em {
-        color: #7f8b99;
-        font-style: italic;
-    }
+    /* ---------- SISYPHUS ---------- */
+    .sisyphus {{
+        margin-top: 3rem; margin-bottom: 2rem; text-align: right;
+        color: {p['text_dim']}; font-style: italic; font-size: 0.95rem;
+    }}
+    .sisyphus em {{ color: {p['accent']}; font-style: italic; }}
+
+    /* ---------- 3D ROBOT ---------- */
+    .scene {{ width: 200px; height: 200px; perspective: 900px; margin: 3rem auto; }}
+    .cube {{
+        width: 100%; height: 100%; position: relative;
+        transform-style: preserve-3d;
+        animation: spin3d 12s infinite linear;
+    }}
+    .face {{
+        position: absolute; width: 200px; height: 200px;
+        background: {p['robot_bg']}; border: 2px solid {p['robot_border']};
+        box-shadow: 0 0 25px {p['glow']}, inset 0 0 25px {p['accent_soft']};
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        border-radius: 24px; gap: 6px;
+    }}
+    .front  {{ transform: translateZ(100px); }}
+    .back   {{ transform: rotateY(180deg) translateZ(100px); }}
+    .right  {{ transform: rotateY(90deg) translateZ(100px); }}
+    .left   {{ transform: rotateY(-90deg) translateZ(100px); }}
+    .top    {{ transform: rotateX(90deg) translateZ(100px); }}
+    .bottom {{ transform: rotateX(-90deg) translateZ(100px); }}
+    .robot-eye {{
+        width: 48px; height: 48px; background: {p['robot_eye']};
+        border-radius: 50%;
+        box-shadow: 0 0 25px {p['robot_eye_glow']},
+                    0 0 50px {p['robot_eye_glow']},
+                    inset 0 0 12px rgba(255,255,255,0.6);
+        animation: blinkRobot 4s infinite;
+    }}
+    .robot-mouth {{
+        width: 70px; height: 10px; background: {p['robot_eye']};
+        border-radius: 6px; margin-top: 12px;
+        box-shadow: 0 0 12px {p['robot_eye_glow']};
+    }}
+    @keyframes blinkRobot {{
+        0%, 88%, 100% {{ transform: scaleY(1); }}
+        92% {{ transform: scaleY(0.1); }}
+    }}
+    @keyframes spin3d {{
+        0%   {{ transform: rotateX(-15deg) rotateY(0deg); }}
+        100% {{ transform: rotateX(-15deg) rotateY(360deg); }}
+    }}
+
+    /* ---------- BYTE VISUAL ---------- */
+    .byte-visual {{
+        position: fixed; bottom: 25px; right: 25px;
+        z-index: 9998; pointer-events: none;
+        animation: bobByte 3s ease-in-out infinite;
+    }}
+    @keyframes bobByte {{
+        0%, 100% {{ transform: translateY(0); }}
+        50%      {{ transform: translateY(-8px); }}
+    }}
+    .byte {{
+        position: relative; width: 80px; height: 80px;
+    }}
+    .byte-body {{
+        position: absolute; bottom: 12px; left: 50%;
+        transform: translateX(-50%);
+        width: 52px; height: 40px;
+        background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
+        border: 2px solid #78350F; border-radius: 6px;
+        box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25),
+                    0 0 14px {p['glow']};
+    }}
+    .byte-body::after {{
+        content: ""; position: absolute; bottom: 6px; left: 8px;
+        width: 14px; height: 6px; background: #78350F; border-radius: 2px;
+    }}
+    .byte-neck {{
+        position: absolute; bottom: 52px; left: 50%;
+        transform: translateX(-50%);
+        width: 6px; height: 10px; background: #78350F; border-radius: 2px;
+    }}
+    .byte-head {{
+        position: absolute; bottom: 62px; left: 50%;
+        transform: translateX(-50%);
+        width: 46px; height: 22px;
+        background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
+        border: 2px solid #78350F; border-radius: 11px;
+        display: flex; align-items: center; justify-content: center;
+        gap: 6px;
+    }}
+    .byte-eye {{
+        width: 12px; height: 12px; background: #0EA5E9;
+        border: 2px solid #78350F; border-radius: 50%;
+        box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);
+        animation: blinkByte 4s infinite;
+    }}
+    @keyframes blinkByte {{
+        0%, 90%, 100% {{ transform: scaleY(1); }}
+        94% {{ transform: scaleY(0.1); }}
+    }}
+    .byte-treads {{
+        position: absolute; bottom: 4px; left: 50%;
+        transform: translateX(-50%);
+        width: 66px; height: 14px;
+        background: #1F2937; border: 2px solid #111827; border-radius: 8px;
+    }}
+    .byte-treads::before, .byte-treads::after {{
+        content: ""; position: absolute; top: 50%;
+        width: 6px; height: 6px; background: #4B5563;
+        border-radius: 50%; transform: translateY(-50%);
+    }}
+    .byte-treads::before {{ left: 8px; }}
+    .byte-treads::after  {{ right: 8px; }}
+
+    /* Invisible click overlay on Byte */
+    .st-key-byte_button {{
+        position: fixed !important;
+        bottom: 25px !important;
+        right: 25px !important;
+        width: 80px !important;
+        height: 80px !important;
+        z-index: 10000 !important;
+        background: transparent !important;
+    }}
+    .st-key-byte_button .stButton > button {{
+        width: 80px !important;
+        height: 80px !important;
+        opacity: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+    }}
+
+    /* Modal look — dialog overlay gets themed */
+    div[role="dialog"] {{
+        background-color: {p['card_bg']} !important;
+        border: 2px solid {p['accent']} !important;
+        border-radius: 20px !important;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.4),
+                    0 0 30px {p['glow']} !important;
+    }}
+    div[role="dialog"] h1,
+    div[role="dialog"] h2,
+    div[role="dialog"] h3,
+    div[role="dialog"] h4 {{
+        color: {p['text']} !important;
+    }}
+    div[role="dialog"] p,
+    div[role="dialog"] span,
+    div[role="dialog"] div {{
+        color: {p['text_muted']};
+    }}
+
+    section[data-testid="stSidebar"] {{ display: none; }}
 </style>
 """
 
 
+# ============================================================
+# PUBLIC INJECT
+# ============================================================
 def inject():
-    st.markdown(THEME, unsafe_allow_html=True)
+    theme = st.session_state.get("theme", "light")
+    p = _palette(theme)
+    st.markdown(_build_theme(p), unsafe_allow_html=True)
 
 
+# ============================================================
+# HTML HELPERS
+# ============================================================
+def _render_html(html: str):
+    try:
+        st.html(html)
+    except AttributeError:
+        cleaned = textwrap.dedent(html)
+        cleaned = "\n".join(line.lstrip() for line in cleaned.split("\n"))
+        st.markdown(cleaned, unsafe_allow_html=True)
+
+
+def render_robot(caption="Agent is ready..."):
+    caption_html = (
+        f'<p style="text-align:center;margin-top:1rem;font-size:0.9rem;">{caption}</p>'
+        if caption else ""
+    )
+    _render_html(
+        f'<div class="scene"><div class="cube">'
+        f'<div class="face front"><div class="robot-eye"></div>'
+        f'<div class="robot-eye"></div><div class="robot-mouth"></div></div>'
+        f'<div class="face back"></div><div class="face right"></div>'
+        f'<div class="face left"></div><div class="face top"></div>'
+        f'<div class="face bottom"></div></div></div>{caption_html}'
+    )
+
+
+# ============================================================
+# BYTE — the corner robot + modal chat
+# ============================================================
+def render_byte(tooltip="Hi, I'm Byte! Click me to chat."):
+    """Render Byte's visual + invisible clickable overlay."""
+    _render_html(
+        '<div class="byte-visual" title="' + tooltip + '">'
+        '<div class="byte">'
+        '<div class="byte-head">'
+        '<div class="byte-eye"></div><div class="byte-eye"></div>'
+        '</div>'
+        '<div class="byte-neck"></div>'
+        '<div class="byte-body"></div>'
+        '<div class="byte-treads"></div>'
+        '</div></div>'
+    )
+    with st.container(key="byte_button"):
+        if st.button(" ", key="byte_click", use_container_width=True):
+            st.session_state["_byte_modal"] = "chat"
+            st.rerun()
+
+
+@st.dialog("🤖 Byte — your assistant", width="large")
+def _byte_chat_dialog(context_hint=""):
+    st.caption("Ask me anything about this page, the app, or ML concepts.")
+
+    if "byte_chat" not in st.session_state:
+        st.session_state.byte_chat = []
+
+    # Chat history
+    for role, text in st.session_state.byte_chat[-8:]:
+        if role == "user":
+            st.markdown(
+                f'<div style="background:{_palette(st.session_state.get("theme","light"))["accent_soft"]};'
+                f'padding:0.6rem 0.9rem;border-radius:12px;margin-bottom:0.5rem;'
+                f'font-size:0.9rem;line-height:1.4;">'
+                f'<b>You:</b> {text}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div style="background:{_palette(st.session_state.get("theme","light"))["pill_purple_bg"]};'
+                f'padding:0.6rem 0.9rem;border-radius:12px;margin-bottom:0.5rem;'
+                f'font-size:0.9rem;line-height:1.4;">'
+                f'<b>Byte:</b> {text}</div>',
+                unsafe_allow_html=True,
+            )
+
+    # Input
+    with st.form("byte_chat_form", clear_on_submit=True):
+        q = st.text_input("Ask Byte", placeholder="e.g. what does this page do?",
+                          label_visibility="collapsed", key="byte_input")
+        c1, c2 = st.columns([4, 1])
+        with c1:
+            sent = st.form_submit_button("Send", use_container_width=True,
+                                          type="primary")
+        with c2:
+            clear = st.form_submit_button("Clear", use_container_width=True)
+
+    if clear:
+        st.session_state.byte_chat = []
+        st.rerun()
+
+    if sent and q.strip():
+        st.session_state.byte_chat.append(("user", q.strip()))
+        with st.spinner("Byte is thinking…"):
+            a = _byte_answer(q.strip(), context_hint)
+        st.session_state.byte_chat.append(("assistant", a))
+        st.rerun()
+
+
+@st.dialog("👋 Hi, I'm Byte!", width="large")
+def _byte_tour_dialog():
+    st.markdown(
+        "I'm your little guide for ML in a Box. Here's what each page does:"
+    )
+    items = [
+        ("🏠 Home", "the landing page — quick-start buttons and a look at the pipeline."),
+        ("🔎 Data Profiler", "upload a dataset (CSV/Excel) or a saved model (.zip)."),
+        ("⚡ Run Pipeline", "train models, explain decisions, download the result."),
+        ("📄 Doc Tools", "upload documents, ask questions with citations, summarize."),
+        ("🤖 Agent Builder", "design your own AI agent and download a blueprint."),
+        ("📖 Knowledge", "interactive concept map — AI, ML, DL, LLM, CV, NLP, Agentic."),
+        ("ℹ️ About", "who built this and what it does."),
+    ]
+    for title, desc in items:
+        st.markdown(f"**{title}** — {desc}")
+
+    st.markdown("---")
+    st.caption("Click me any time in the corner and I'll answer questions.")
+
+    if st.button("Got it — let's go!", type="primary",
+                 use_container_width=True, key="tour_close"):
+        st.session_state["_byte_tour_done"] = True
+        st.rerun()
+
+
+def render_byte_chat(context_hint="", show_tour_if_new=True):
+    """
+    Called from app.py after render_byte(). Handles:
+      - First-visit onboarding tour (once per session)
+      - Modal chat when Byte is clicked
+    """
+    # Tour: show once per session on first render
+    if (show_tour_if_new
+            and st.session_state.get("_byte_tour_done") is False):
+        _byte_tour_dialog()
+
+    # Chat modal
+    if st.session_state.get("_byte_modal") == "chat":
+        st.session_state["_byte_modal"] = None
+        _byte_chat_dialog(context_hint)
+
+
+def _byte_answer(question: str, context_hint: str) -> str:
+    """Ask the LLM with Byte's personality, honoring language setting."""
+    from llm import ask as _llm_ask
+    lang = st.session_state.get("lang", "en")
+    lang_line = ("Answer in **Arabic**." if lang == "ar"
+                 else "Answer in English.")
+    prompt = (
+        "You are Byte — a friendly Wall-E-style robot assistant inside the "
+        "app 'ML in a Box'. Answer in 2-4 short, warm sentences. Plain language, "
+        "no jargon unless needed. If you don't know, say so honestly. "
+        f"{lang_line}\n\n"
+        f"--- Page context ---\n{context_hint or 'No page context.'}\n---\n\n"
+        f"User asks: {question}"
+    )
+    try:
+        return (_llm_ask(prompt, temperature=0.5) or "").strip()
+    except Exception as e:
+        return f"(Byte is offline right now: {type(e).__name__})"
+
+
+# ============================================================
+# PUBLIC HELPERS (kept identical for other pages)
+# ============================================================
 def watermark():
     st.markdown(
-        '<div class="wm">'
-        '<b>Engr. Anas Yousef Albakoush</b>'
+        '<div class="wm"><b>Engr. Anas Yousef Albakoush</b>'
         '<span class="sep">·</span>'
         '<b>Engr. Muad Salah Himeedah</b>'
         '<span class="sep">·</span>'
-        '<span class="brand">ML in a Box</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+        '<span class="brand">ML in a Box</span></div>',
+        unsafe_allow_html=True)
 
 
 def sisyphus():
@@ -235,24 +697,21 @@ def hero(title, subtitle, pills=None):
     pills_html = ""
     if pills:
         pills_html = " ".join(f'<span class="pill">{p}</span>' for p in pills)
-    st.markdown(
-        f'<div class="hero"><h1>{title}</h1><p>{subtitle}</p>{pills_html}</div>',
-        unsafe_allow_html=True)
+    _render_html(
+        f'<div class="hero"><h1>{title}</h1><p>{subtitle}</p>{pills_html}</div>')
 
 
 def card(icon, title, body, pill=None):
     pill_html = f'<span class="pill">{pill}</span>' if pill else ""
-    st.markdown(
+    _render_html(
         f'<div class="card"><span class="icon">{icon}</span>'
-        f'<h4>{title} {pill_html}</h4><p>{body}</p></div>',
-        unsafe_allow_html=True)
+        f'<h4>{title} {pill_html}</h4><p>{body}</p></div>')
 
 
 def stat(num, label):
-    st.markdown(
+    _render_html(
         f'<div class="stat"><p class="num">{num}</p>'
-        f'<div class="lbl">{label}</div></div>',
-        unsafe_allow_html=True)
+        f'<div class="lbl">{label}</div></div>')
 
 
 def trace_line(text):
@@ -260,284 +719,108 @@ def trace_line(text):
 
 
 def prose(html: str):
-    st.markdown(f'<div class="prose">{html}</div>', unsafe_allow_html=True)
+    cleaned = textwrap.dedent(html).strip()
+    cleaned = "\n".join(line.strip() for line in cleaned.split("\n"))
+    _render_html(f'<div class="prose">{cleaned}</div>')
 
 
 def deployment_locked(title="Deploy to production",
-                      body="Package the model as a REST API, add authentication, "
-                           "and serve it behind a load balancer.",
-                      sub="This build is a research prototype. Deployment is "
-                          "intentionally disabled so the model stays local."):
-    st.markdown(
-        f'<div class="deploy-locked">'
-        f'<div class="deploy-inner">'
-        f'<h4>🚀 {title}</h4>'
-        f'<p>{body}</p>'
-        f'</div>'
-        f'<div class="lock-overlay">'
-        f'<div class="lock-icon">🔒</div>'
+                      body="Package the model as a REST API, add auth, and "
+                           "serve it behind a load balancer.",
+                      sub="This build is a research prototype."):
+    _render_html(
+        f'<div class="deploy-locked"><div class="deploy-inner">'
+        f'<h4>🚀 {title}</h4><p>{body}</p></div>'
+        f'<div class="lock-overlay"><div class="lock-icon">🔒</div>'
         f'<div class="lock-text">Deployment is locked</div>'
-        f'<div class="lock-sub">{sub}</div>'
-        f'</div>'
-        f'</div>',
-        unsafe_allow_html=True)
+        f'<div class="lock-sub">{sub}</div></div></div>')
 
 
 def profile_photo(path, fallback_icon="👤"):
-    """Show a team photo if the file exists, otherwise show the emoji."""
     if path and os.path.isfile(path):
         st.image(path, use_container_width=True)
     else:
         st.markdown(
             f'<div style="text-align:center;font-size:4rem;padding:1rem;">'
-            f'{fallback_icon}</div>',
-            unsafe_allow_html=True)
+            f'{fallback_icon}</div>', unsafe_allow_html=True)
 
 
+# ============================================================
+# GLOSSARY (kept for i18n.py compatibility)
+# ============================================================
 GLOSSARY_CATEGORIES = {
     "Regression metrics": [
-        ("R² (R-squared)",
-         "How much of the target's variation the model explains.",
-         "1.0 is perfect. 0 is useless. R² = 0.71 means the model explains 71% "
-         "of the target's ups and downs.",
-         "Above 0.7 is strong. Below 0.2 means the columns don't predict the target."),
-        ("MAE (Mean Absolute Error)",
-         "Average size of the prediction error, in the target's own units.",
-         "Measure the gap for each prediction. Take absolute values. Average.",
-         "Lower is better. Compare against the baseline's MAE."),
-        ("RMSE (Root Mean Squared Error)",
-         "Like MAE, but punishes big mistakes more.",
-         "Square each error first, then average, then take the square root.",
-         "Lower is better. RMSE >> MAE means a few predictions are wildly off."),
+        ("R² (R-squared)", "How much of the target's variation the model explains.",
+         "1.0 is perfect.", "Above 0.7 is strong."),
+        ("MAE", "Average prediction error.", "Mean abs error.", "Lower is better."),
+        ("RMSE", "Like MAE, punishes big errors.", "Sqrt of MSE.", "Lower is better."),
     ],
     "Classification metrics": [
-        ("Accuracy",
-         "Fraction of predictions that were exactly right.",
-         "Count matches, divide by total. Misleading when one class dominates.",
-         "Compare against the baseline. If the baseline is 90%, accuracy lies."),
-        ("Precision",
-         "When the model says 'class X', how often is it right?",
-         "Of everything labeled class X, what fraction truly belongs.",
-         "Higher is better. Use it when false alarms are expensive."),
-        ("Recall",
-         "Of all real cases of class X, how many did the model find?",
-         "Of everything that truly is class X, what share the model caught.",
-         "Higher is better. Use it when missing a case is expensive."),
-        ("F1 score",
-         "Balance between precision and recall. One number that considers both.",
-         "Harmonic mean of the two.",
-         "0.9+ is excellent. Below 0.3 means the model barely helps."),
-        ("Confusion matrix",
-         "A table showing what the model predicted vs what actually happened.",
-         "Rows are reality, columns are predictions. The diagonal is correct.",
-         "Look at where the off-diagonal mass is. Those are the mistakes."),
+        ("Accuracy", "Fraction correct.", "Matches / total.", "Baseline check."),
+        ("Precision", "True positives / (TP+FP).", "TP/(TP+FP).", "Higher better."),
+        ("Recall", "TP / (TP+FN).", "TP/(TP+FN).", "Higher better."),
+        ("F1", "Harmonic mean.", "Balance of both.", "0.9+ excellent."),
+        ("Confusion matrix", "Predictions vs reality.", "Diagonal correct.",
+         "Off-diag is mistakes."),
     ],
     "ML models": [
-        ("Linear Regression",
-         "Fits a straight-line relationship between inputs and a numeric target.",
-         "Predicts a weighted sum of the inputs, plus an intercept.",
-         "Fast, explainable. Struggles with curved or non-linear patterns."),
-        ("Logistic Regression",
-         "Linear classifier. Predicts the probability of each class.",
-         "Fits a linear boundary, then applies a logistic curve.",
-         "Simple, interpretable, often very competitive on text."),
-        ("Ridge / Lasso",
-         "Linear models with regularization.",
-         "Ridge shrinks coefficients; Lasso drops weak ones to zero.",
-         "Ridge when inputs are correlated. Lasso for automatic feature selection."),
-        ("Decision Tree",
-         "Learns a series of yes/no questions that split the data.",
-         "Each internal node tests one feature; each leaf predicts.",
-         "Very interpretable, but tends to overfit. Base for ensembles."),
-        ("Random Forest",
-         "Many decision trees voting together.",
-         "Each tree trains on a random subset of rows and columns.",
-         "Robust, rarely needs tuning. A very common strong default."),
-        ("Gradient Boosting",
-         "Trees that fix each other's mistakes in sequence.",
-         "Each new tree is trained on the errors of the previous ensemble.",
-         "Often the strongest performer on tabular data."),
-        ("Extra Trees",
-         "Like Random Forest but with even more randomness in the splits.",
-         "Splits are chosen at random instead of optimised.",
-         "Faster to train. Worth trying alongside a forest."),
-        ("AdaBoost",
-         "Boosting with shallow trees ('stumps') as the base learner.",
-         "Later stumps focus on the rows earlier stumps got wrong.",
-         "Strong when the signal is simple."),
-        ("Bagging",
-         "Many instances of one model, each on a random subset of rows.",
-         "Predictions are averaged (regression) or voted (classification).",
-         "A cheap variance reduction on any base model."),
-        ("K-Nearest Neighbours (KNN)",
-         "Predicts from the most similar past examples.",
-         "Find the K closest rows, then average or vote among them.",
-         "Great on small data with few columns. Sensitive to scaling."),
-        ("SVM (Support Vector Machine)",
-         "Finds the widest possible boundary between classes.",
-         "Maximises the margin between the closest points of each class.",
-         "Strong on small, clean data. Doesn't scale to huge datasets."),
-        ("Naive Bayes",
-         "A probabilistic classifier that assumes features are independent.",
-         "Each feature votes for a class, weighted by how often it appears.",
-         "Extremely fast. Surprisingly strong on text."),
-        ("Neural Network (MLP)",
-         "Layers of simple units that learn non-linear patterns.",
-         "Each layer transforms the previous one. Weights learned by backprop.",
-         "Flexible, but needs more data and tuning than tree ensembles."),
-        ("Deep Learning",
-         "Neural networks with many layers. Same idea as an MLP, scaled up.",
-         "More layers, more data, more compute.",
-         "Often overkill for tabular data. The right choice for images/text."),
+        ("Linear Regression", "Straight-line fit.", "Weighted sum.", "Fast, explainable."),
+        ("Logistic Regression", "Linear classifier.", "Sigmoid.", "Interpretable."),
+        ("Ridge / Lasso", "Regularized linear.", "Penalty on size.", "Ridge for correlation."),
+        ("Decision Tree", "Yes/no questions.", "Split on feature.", "Interpretable, overfits."),
+        ("Random Forest", "Many trees.", "Random subsets.", "Robust."),
+        ("Gradient Boosting", "Trees fixing mistakes.", "Sequential.", "Often strongest."),
+        ("Extra Trees", "More random forest.", "Random splits.", "Fast."),
+        ("AdaBoost", "Boosting with stumps.", "Focus mistakes.", "Simple signal."),
+        ("Bagging", "Random subsets.", "Vote/average.", "Variance reduction."),
+        ("KNN", "Nearest neighbors.", "K closest.", "Sensitive to scale."),
+        ("SVM", "Widest boundary.", "Margin max.", "Small clean data."),
+        ("Naive Bayes", "Independent features.", "Probabilistic.", "Fast on text."),
+        ("Neural Network (MLP)", "Layers of units.", "Backprop.", "Needs more data."),
+        ("Deep Learning", "Many-layer nets.", "Scale up MLP.", "Best for images/text."),
     ],
     "Training concepts": [
-        ("Baseline",
-         "The dumbest possible model. Shows what 'doing nothing' looks like.",
-         "Regression: predicts the average. Classification: most common class.",
-         "If your best model barely beats the baseline, the data doesn't predict."),
-        ("Overfitting",
-         "The model memorised the training rows instead of learning patterns.",
-         "Great on training rows, bad on new rows.",
-         "The agent checks for it and tries to fix it automatically."),
-        ("Underfitting",
-         "The model is too simple to capture the pattern.",
-         "Bad on training rows and bad on new rows.",
-         "Fix by using a more flexible model, or better inputs."),
-        ("Class imbalance",
-         "One class has far more examples than others.",
-         "If 95% of rows are class A, accuracy lies.",
-         "The agent warns when the biggest class is 5x the smallest."),
-        ("Cross-validation (CV)",
-         "The score during training, averaged over several splits.",
-         "Data is split into folds; each fold is used as the test set once.",
-         "Compare with the test score. A gap means overfitting."),
-        ("Train / test split",
-         "The data is divided into two parts: learn on one, check on the other.",
-         "The model never sees the test rows during training.",
-         "80/20 is the common default."),
-        ("Feature importance",
-         "How much each input column changes the model's predictions.",
-         "Shuffle one column at a time, watch the score drop.",
-         "Bigger drop = more influential column."),
-        ("Regularization",
-         "A penalty for complexity that keeps the model from overfitting.",
-         "Adds a term to the loss that punishes large weights.",
-         "Higher regularization = smoother model."),
-        ("Hyperparameter",
-         "A setting you choose before training.",
-         "Examples: number of trees, max depth, learning rate, dropout rate.",
-         "The setup panel lets you set these per model."),
-        ("Feature engineering",
-         "Creating new inputs from existing ones to help the model learn.",
-         "Examples: ratios, products, date parts, keyword flags.",
-         "Usually the highest-leverage thing you can do."),
-        ("Interaction feature",
-         "A new column created by combining two existing columns.",
-         "Examples: price / area, weight * height, date_a - date_b.",
-         "Captures combined effects that neither column shows alone."),
-        ("Imputation",
-         "Filling in missing values so a model can use the column.",
-         "Common strategies: median, mean, mode, or dropping the row.",
-         "The agent's cleaning plan proposes these per column."),
-        ("Standardization",
-         "Rescaling features so none dominates just because of its units.",
-         "Subtract the mean, divide by the standard deviation.",
-         "Essential for models that use distances or gradient descent."),
-        ("One-hot encoding",
-         "Turning a categorical column into many binary columns.",
-         "Each category becomes its own 0/1 column.",
-         "Standard for text, countries, product types."),
+        ("Baseline", "Dumbest model.", "Predicts average.", "Beat it."),
+        ("Overfitting", "Memorised training.", "Train high, test low.", "Agent fixes."),
+        ("Underfitting", "Too simple.", "Both low.", "Flexible model."),
+        ("Class imbalance", "One class dominates.", "Accuracy lies.", "Warn at 5x."),
+        ("Cross-validation", "Score over folds.", "Average.", "Compare to test."),
+        ("Train/test split", "Learn/check split.", "Model never sees test.", "80/20 typical."),
+        ("Feature importance", "Which inputs matter.", "Shuffle watch.", "Bigger = more."),
+        ("Regularization", "Complexity penalty.", "Loss term.", "Smoother."),
+        ("Hyperparameter", "Pre-training setting.", "Trees/LR.", "Setup panel."),
+        ("Feature engineering", "New inputs from old.", "Ratios, dates.", "High leverage."),
+        ("Interaction", "Combined columns.", "a*b.", "Joint effects."),
+        ("Imputation", "Fill missing.", "Median/mode.", "Auto-proposed."),
+        ("Standardization", "Rescale.", "Z-score.", "Distance models."),
+        ("One-hot", "Categorical to binary.", "0/1 columns.", "Standard."),
     ],
     "Agentic AI": [
-        ("Agentic AI",
-         "An LLM in a loop with tools and a way to check its own work.",
-         "The agent decides the plan, code executes, a human approves, a review node reacts.",
-         "Four decisions: the target, interactions, models, and the repair."),
-        ("Human-in-the-loop",
-         "The agent pauses for a person to approve before doing something irreversible.",
-         "Before any cleaning or training, the graph stops and shows the plan.",
-         "The key difference between an automated script and an agent."),
-        ("Guardrail",
-         "A code check that constrains what the LLM is allowed to do.",
-         "The LLM returns JSON. Code validates each field against the real data.",
-         "Rejected fields get logged as warnings."),
-        ("Tool calling",
-         "When the LLM asks the code to run a specific function.",
-         "The model outputs a structured request; code executes it.",
-         "Prevents the LLM from executing arbitrary code."),
-        ("State (in an agent)",
-         "Everything the agent needs to remember between steps.",
-         "Held in LangGraph's state dict; large objects live in a side cache.",
-         "The checkpointer saves state to disk so the graph can pause."),
-        ("Checkpoint",
-         "A save point in the graph that the agent can pause at and resume from.",
-         "LangGraph's `interrupt()` creates one at the human approval step.",
-         "The graph truly pauses, not just waits for input()."),
-        ("Self-check",
-         "A node that inspects its own output and decides whether to try again.",
-         "Compares train score to test score, checks class balance.",
-         "The result is 'accepted' or a specific repair attempt."),
-        ("Run history",
-         "A log of every past run, kept on disk.",
-         "The agent reads it before picking models.",
-         "This is how the agent 'learns' — by reading its own notes."),
+        ("Agentic AI", "LLM in a loop.", "Plan/execute/review.", "Four decisions."),
+        ("Human-in-the-loop", "Pause for approval.", "Graph interrupts.", "Makes it agentic."),
+        ("Guardrail", "Code check.", "Validate JSON.", "Logged."),
+        ("Tool calling", "LLM runs a function.", "Structured request.", "Prevents arbitrary."),
+        ("State", "What the agent remembers.", "LangGraph dict.", "Checkpointer saves."),
+        ("Checkpoint", "Pause/resume point.", "interrupt().", "Real pause."),
+        ("Self-check", "Inspects own output.", "Compares scores.", "Accept or fix."),
+        ("Run history", "Log of runs.", "Reads before deciding.", "How agent learns."),
     ],
     "NLP": [
-        ("Tokenization",
-         "Splitting text into individual units (words, punctuation).",
-         "The first step of every NLP pipeline.",
-         "Tokens are what get counted, weighted, and fed to models."),
-        ("Stop-words",
-         "Very common words ('the', 'and', 'of') that carry little meaning.",
-         "Often removed to reduce noise and shrink the vocabulary.",
-         "Useful for frequency analysis. Sometimes harmful for sentiment."),
-        ("TF-IDF",
-         "How often a word appears in a document, weighted by how rare it is.",
-         "Common words get low weight. Distinctive words get high weight.",
-         "The result is a numeric matrix classifiers can learn from."),
-        ("Bag of words",
-         "A count of each word, order ignored.",
-         "Every document becomes a vector of word counts.",
-         "Fast and effective. Loses word order and grammar."),
-        ("N-gram",
-         "A sequence of N consecutive words or characters.",
-         "Bigram = two words. Trigram = three words.",
-         "Captures short phrases. TF-IDF here uses bigrams."),
-        ("Cleaning / preprocessing",
-         "Stripping HTML, URLs, punctuation, and case before analysis.",
-         "Every step is a toggle in this project.",
-         "Always look at the stats to see what actually changed."),
-        ("Extractive summarization",
-         "Picking the most informative sentences, verbatim.",
-         "Offline, deterministic, fully explainable.",
-         "Fast and safe. No LLM involved."),
-        ("Abstractive summarization",
-         "Rewriting the text as a shorter version, in the model's own words.",
-         "Uses the LLM. Compact and readable, but slower.",
-         "Best for long sources that need paraphrasing."),
-        ("Topic clustering",
-         "Grouping documents into themes with KMeans over TF-IDF vectors.",
-         "Documents that share distinctive words end up in the same cluster.",
-         "Silhouette above 0.2 means cleanly separated clusters."),
-        ("Silhouette score",
-         "A measure of how cleanly separated the clusters are.",
-         "Ranges from -1 to 1. Above 0.2 is decent, above 0.5 is strong.",
-         "Lower means clusters overlap — try a different topic count."),
-        ("Cosine similarity",
-         "A measure of how similar two documents are, based on their word vectors.",
-         "1.0 = identical direction, 0 = unrelated.",
-         "Used by the similarity search panel."),
-        ("Sentiment analysis",
-         "Classifying text as positive, negative, or neutral.",
-         "The LLM scores a sample; the dashboard shows the distribution.",
-         "Fast for a summary. For production, train a proper classifier."),
-        ("Word cloud",
-         "A picture where more frequent words appear larger.",
-         "Built from the whole corpus with stop-words removed.",
-         "A quick way to see the topics at a glance."),
+        ("Tokenization", "Split into units.", "First step.", "Feeds models."),
+        ("Stop-words", "Common low-meaning.", "Often removed.", "Sometimes bad."),
+        ("TF-IDF", "Frequency / rarity.", "Distinctive weigh more.", "Numeric matrix."),
+        ("Bag of words", "Counts, no order.", "Vector of counts.", "Fast."),
+        ("N-gram", "N consecutive words.", "Bigrams.", "Phrases."),
+        ("Cleaning", "Strip HTML, etc.", "Toggles.", "Check stats."),
+        ("Extractive summary", "Pick best sentences.", "Offline.", "Safe."),
+        ("Abstractive summary", "Rewrite shorter.", "Uses LLM.", "Best for long text."),
+        ("Topic clustering", "Group by theme.", "KMeans.", "Silhouette > 0.2."),
+        ("Silhouette", "Cluster separation.", "-1 to 1.", "0.5+ strong."),
+        ("Cosine similarity", "Doc similarity.", "1 = same.", "Search."),
+        ("Sentiment analysis", "Pos/neg/neutral.", "LLM scores sample.", "Train classifier for prod."),
+        ("Word cloud", "Frequent words larger.", "Whole corpus.", "Quick glance."),
     ],
 }
-
 
 GLOSSARY = {
     term: (short, long_, how)

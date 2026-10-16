@@ -2408,3 +2408,27 @@ def agent_tune_hyperparams(model_key, task, current_params):
         return json.loads(reply[start:end+1])
     except Exception:
         return current_params
+# ============================================================ XAI HELPERS
+def get_pipeline_model(pipeline):
+    """Return the innermost sklearn model from a full pipeline."""
+    if hasattr(pipeline, "named_steps"):
+        return pipeline.named_steps.get("model", pipeline)
+    if hasattr(pipeline, "pipe_"):
+        return pipeline.pipe_.named_steps.get("model", pipeline)
+    return pipeline
+
+
+def get_feature_names(pipeline, fallback_features):
+    """Best-effort extraction of the transformed feature names."""
+    try:
+        if hasattr(pipeline, "named_steps"):
+            prep = pipeline.named_steps.get("prep")
+            if prep is not None and hasattr(prep, "get_feature_names_out"):
+                return list(prep.get_feature_names_out())
+        elif hasattr(pipeline, "pipe_"):
+            prep = pipeline.pipe_.named_steps.get("prep")
+            if prep is not None and hasattr(prep, "get_feature_names_out"):
+                return list(prep.get_feature_names_out())
+    except Exception:
+        pass
+    return list(fallback_features)

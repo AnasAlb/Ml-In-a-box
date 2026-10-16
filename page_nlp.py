@@ -1,12 +1,11 @@
 """
-NLP pages: Tools (document processing) and Dashboard (corpus analytics).
+Doc Tools — merged NLP Tools + Dashboard + RAG Q&A with citations.
 """
 import os
-import uuid
-import json
-import re
 import io
-import datetime
+import re
+import json
+import uuid
 from collections import Counter
 
 import streamlit as st
@@ -19,9 +18,33 @@ from ml import load_table_with_notes
 from nlp import (clean_text, tokenize, key_phrases, summarize_extractive,
                  summarize_abstractive, translate, fix_grammar,
                  cluster_documents, search_documents, STOP_WORDS)
+from llm import ask
 
 
-# ============================================================ FILE READERS
+# ============================================================
+# LAZY LOADERS
+# ============================================================
+@st.cache_resource(show_spinner=False)
+def _load_embedder():
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        def encode(texts):
+            return model.encode(texts, normalize_embeddings=True,
+                                 show_progress_bar=False)
+        return {"kind": "st", "encode": encode, "dim": 384}
+    except Exception:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        def encode(texts):
+            vec = TfidfVectorizer(stop_words="english",
+                                   ngram_range=(1, 2), sublinear_tf=True)
+            X = vec.fit_transform(texts).toarray()
+            norms = (X ** 2).sum(axis=1) ** 0.5
+            norms[norms == 0] = 1
+            return X / norms[:, None]
+        return {"kind": "tfidf", "encode": encode, "dim": None}
+
+
 def _read_plain_text(uploaded):
     try:
         raw = uploaded.getvalue()
@@ -39,20 +62,20 @@ def _read_pdf(uploaded):
     try:
         from pypdf import PdfReader
     except ImportError:
-        return None, "Reading PDF files needs `pypdf`. Run: `pip install pypdf`."
+        return None, "Install `pypdf` to read PDFs."
     try:
         reader = PdfReader(io.BytesIO(uploaded.getvalue()))
         pages = []
-        for p in reader.pages:
+        for i, p in enumerate(reader.pages, 1):
             try:
                 txt = p.extract_text() or ""
             except Exception:
                 txt = ""
             if txt.strip():
-                pages.append(txt.strip())
+                pages.append((i, txt.strip()))
         if not pages:
-            return None, "That PDF has no extractable text (may be scanned)."
-        return "\n\n".join(pages), None
+            return None, "That PDF has no extractable text."
+        return pages, None
     except Exception as e:
         return None, f"Could not read PDF: {type(e).__name__}: {e}"
 
@@ -61,341 +84,528 @@ def _read_docx(uploaded):
     try:
         import docx
     except ImportError:
-        return None, "Reading Word files needs `python-docx`. Run: `pip install python-docx`."
+        return None, "Install `python-docx` to read Word files."
     try:
         doc = docx.Document(io.BytesIO(uploaded.getvalue()))
         paras = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
         if not paras:
-            return None, "That Word document has no text paragraphs."
-        return "\n\n".join(paras), None
+            return None, "That Word document has no text."
+        pages = [(i // 20 + 1, "\n".join(paras[i:i + 20]))
+                 for i in range(0, len(paras), 20)]
+        return pages, None
     except Exception as e:
         return None, f"Could not read DOCX: {type(e).__name__}: {e}"
 
 
-# ============================================================ NLP TOOLS
-NL_KEYS = ("nlp_input", "nlp_docs", "nlp_docs_cleaned", "nlp_cleaned",
-           "nlp_clean_stats", "nlp_tokens", "nlp_extractive",
-           "nlp_abstractive", "nlp_translation", "nlp_grammar",
-           "nlp_phrases", "nlp_clusters", "nlp_search_results",
-           "_clean_hash", "_nlp_last_file_sig")
+# ============================================================
+# ANIMATED SVG BOOK
+# ============================================================
+def _render_book_svg():
+    theme = st.session_state.get("theme", "light")
+    if theme == "dark":
+        cover_dark = "#1F2937"; cover_light = "#374151"
+        pages = "#E5E7EB"; spine = "#00F0FF"; word_color = "#00F0FF"
+        shadow = "rgba(0, 240, 255, 0.35)"
+    else:
+        cover_dark = "#78350F"; cover_light = "#B45309"
+        pages = "#FFFFFF"; spine = "#D4AF37"; word_color = "#B8860B"
+        shadow = "rgba(212, 175, 55, 0.35)"
+
+    st.markdown(f"""
+    <div style="display:flex; justify-content:center; padding:1.5rem 0 2.5rem 0;">
+    <svg width="360" height="220" viewBox="0 0 360 220"
+         xmlns="http://www.w3.org/2000/svg" aria-label="Animated book">
+      <defs>
+        <filter id="bookShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="6" />
+          <feOffset dx="0" dy="4" result="offsetblur" />
+          <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+          <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <linearGradient id="coverGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="{cover_light}"/>
+          <stop offset="100%" stop-color="{cover_dark}"/>
+        </linearGradient>
+        <linearGradient id="pageGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="{pages}" stop-opacity="1"/>
+          <stop offset="100%" stop-color="{pages}" stop-opacity="0.85"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="180" cy="200" rx="140" ry="8" fill="{shadow}" opacity="0.35">
+        <animate attributeName="rx" values="140;130;140" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.35;0.2;0.35" dur="4s" repeatCount="indefinite"/>
+      </ellipse>
+      <g filter="url(#bookShadow)">
+        <path d="M 50 60 Q 90 50 175 55 L 175 185 Q 90 180 50 190 Z"
+              fill="url(#coverGrad)" stroke="{spine}" stroke-width="1.5"/>
+        <path d="M 175 55 Q 260 50 310 60 L 310 190 Q 260 180 175 185 Z"
+              fill="url(#coverGrad)" stroke="{spine}" stroke-width="1.5"/>
+        <line x1="175" y1="55" x2="175" y2="185"
+              stroke="{spine}" stroke-width="2.5" opacity="0.7"/>
+      </g>
+      <g opacity="0.9">
+        <path d="M 58 66 Q 96 58 172 62 L 172 180 Q 96 176 58 182 Z"
+              fill="url(#pageGrad)" stroke="#9CA3AF" stroke-width="0.6"/>
+        <path d="M 62 72 Q 98 64 170 68 L 170 176 Q 98 172 62 178 Z"
+              fill="url(#pageGrad)" stroke="#9CA3AF" stroke-width="0.6"/>
+      </g>
+      <g opacity="0.55">
+        <rect x="80" y="90" width="70" height="3" rx="1.5" fill="#6B7280"/>
+        <rect x="80" y="102" width="60" height="3" rx="1.5" fill="#6B7280"/>
+        <rect x="80" y="114" width="72" height="3" rx="1.5" fill="#6B7280"/>
+        <rect x="80" y="126" width="52" height="3" rx="1.5" fill="#6B7280"/>
+      </g>
+      <g>
+        <path d="M 180 62 Q 258 58 302 66 L 302 184 Q 258 176 180 180 Z"
+              fill="url(#pageGrad)" stroke="#9CA3AF" stroke-width="0.6"
+              transform-origin="180 121">
+          <animateTransform attributeName="transform" type="rotate"
+                            values="0 180 121; 0 180 121; -180 180 121; -180 180 121; 0 180 121"
+                            keyTimes="0; 0.15; 0.45; 0.85; 1"
+                            dur="5s" repeatCount="indefinite"/>
+        </path>
+        <path d="M 182 68 Q 256 64 298 72 L 298 178 Q 256 172 182 176 Z"
+              fill="url(#pageGrad)" stroke="#9CA3AF" stroke-width="0.6"
+              transform-origin="182 122">
+          <animateTransform attributeName="transform" type="rotate"
+                            values="0 182 122; 0 182 122; -180 182 122; -180 182 122; 0 182 122"
+                            keyTimes="0; 0.3; 0.6; 0.95; 1"
+                            dur="5s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      <g font-family="Plus Jakarta Sans, sans-serif" font-weight="700"
+         font-size="11" fill="{word_color}" text-anchor="middle">
+        <text x="120" y="80" opacity="0">words
+          <animate attributeName="opacity" values="0;1;0"
+                   keyTimes="0;0.5;1" dur="3.5s" begin="0s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate"
+                            values="0 0; -8 -60" dur="3.5s" begin="0s"
+                            repeatCount="indefinite"/>
+        </text>
+        <text x="180" y="80" opacity="0">ideas
+          <animate attributeName="opacity" values="0;1;0"
+                   keyTimes="0;0.5;1" dur="3.5s" begin="0.9s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate"
+                            values="0 0; 4 -70" dur="3.5s" begin="0.9s"
+                            repeatCount="indefinite"/>
+        </text>
+        <text x="240" y="80" opacity="0">insight
+          <animate attributeName="opacity" values="0;1;0"
+                   keyTimes="0;0.5;1" dur="3.5s" begin="1.8s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate"
+                            values="0 0; 10 -55" dur="3.5s" begin="1.8s"
+                            repeatCount="indefinite"/>
+        </text>
+        <text x="200" y="80" opacity="0">meaning
+          <animate attributeName="opacity" values="0;1;0"
+                   keyTimes="0;0.5;1" dur="3.5s" begin="2.6s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate"
+                            values="0 0; -6 -65" dur="3.5s" begin="2.6s"
+                            repeatCount="indefinite"/>
+        </text>
+      </g>
+    </svg>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-def _nlp_init():
+# ============================================================
+# RAG ENGINE
+# ============================================================
+def _chunk_document(filename, pages, chunk_size=500, overlap=100):
+    chunks = []; cid = 0
+    for page_num, page_text in pages:
+        words = page_text.split()
+        if not words: continue
+        if len(words) <= chunk_size:
+            chunks.append({"chunk_id": cid, "source": filename,
+                           "page": page_num, "text": page_text}); cid += 1
+            continue
+        step = max(1, chunk_size - overlap)
+        for i in range(0, len(words), step):
+            piece = words[i:i + chunk_size]
+            if not piece: break
+            chunks.append({"chunk_id": cid, "source": filename,
+                           "page": page_num, "text": " ".join(piece)})
+            cid += 1
+            if i + chunk_size >= len(words): break
+    return chunks
+
+
+def _build_index(chunks):
+    embedder = _load_embedder()
+    texts = [c["text"] for c in chunks]
+    if not texts: return embedder, None
+    vectors = embedder["encode"](texts)
+    return embedder, vectors
+
+
+def _retrieve(query, chunks, embedder, vectors, top_k=4):
+    if vectors is None or len(chunks) == 0: return []
+    q_vec = embedder["encode"]([query])[0]
+    scores = vectors @ q_vec
+    order = scores.argsort()[::-1][:top_k]
+    return [{**chunks[int(i)], "score": float(scores[int(i)])}
+            for i in order if scores[i] > 0]
+
+
+def _answer_with_citations(query, retrieved):
+    if not retrieved:
+        return {"answer": "No relevant passages found in the loaded documents.",
+                "citations": []}
+    context = "\n\n".join(
+        f"[Source: {r['source']}, Page {r['page']}]\n{r['text']}"
+        for r in retrieved)
+    prompt = ("You are a precise research assistant. Answer the user's "
+              "question using ONLY the passages below. For every claim, cite "
+              "the source using the exact format [Source: filename, Page N]. "
+              "If the passages do not contain the answer, say so plainly — do "
+              "not guess.\n\n"
+              f"--- PASSAGES ---\n{context}\n--- END ---\n\n"
+              f"Question: {query}\n\nAnswer (with inline citations):")
+    try:
+        answer = (ask(prompt, temperature=0.1) or "").strip()
+    except Exception as e:
+        return {"answer": f"(LLM unavailable: {type(e).__name__})", "citations": []}
+    citations = re.findall(r"\[Source:\s*([^,\]]+),\s*Page\s*(\d+)\]", answer)
+    citations = [{"source": s.strip(), "page": int(p)} for s, p in citations]
+    return {"answer": answer, "citations": citations}
+
+
+# ============================================================
+# STATE
+# ============================================================
+NL_KEYS = ("doc_input", "doc_pages", "doc_filename", "doc_chunks",
+           "doc_embedder", "doc_vectors", "doc_cleaned", "doc_clean_stats",
+           "doc_tokens", "doc_extractive", "doc_abstractive",
+           "doc_phrases", "doc_clusters", "doc_search_results",
+           "doc_rag_history", "doc_api_key", "_doc_clean_hash",
+           "_doc_last_sig")
+
+
+def _init_state():
     for k in NL_KEYS:
         if k not in st.session_state:
             st.session_state[k] = None
-    if st.session_state.get("nlp_input") is None:
-        st.session_state["nlp_input"] = ""
-    if st.session_state.get("nlp_docs") is None:
-        st.session_state["nlp_docs"] = []
+    if st.session_state.get("doc_pages") is None:
+        st.session_state["doc_pages"] = []
+    if st.session_state.get("doc_chunks") is None:
+        st.session_state["doc_chunks"] = []
+    if st.session_state.get("doc_rag_history") is None:
+        st.session_state["doc_rag_history"] = []
 
 
-def _nlp_reset_derived():
-    for k in ("nlp_cleaned", "nlp_clean_stats", "nlp_tokens",
-              "nlp_extractive", "nlp_abstractive", "nlp_translation",
-              "nlp_grammar", "nlp_phrases", "nlp_clusters",
-              "nlp_search_results", "nlp_docs_cleaned", "_clean_hash"):
+def _reset_derived():
+    for k in ("doc_cleaned", "doc_clean_stats", "doc_tokens",
+              "doc_extractive", "doc_abstractive", "doc_phrases",
+              "doc_clusters", "doc_search_results", "_doc_clean_hash"):
         st.session_state[k] = None
+
+
+def _ingest_file(up):
+    if up is None: return
+    sig = (up.name, getattr(up, "size", None))
+    if st.session_state.get("_doc_last_sig") == sig: return
+    st.session_state["_doc_last_sig"] = sig
+
+    name = up.name.lower()
+    pages = None; err = None
+
+    if name.endswith(".pdf"):
+        pages, err = _read_pdf(up)
+    elif name.endswith(".docx"):
+        pages, err = _read_docx(up)
+    elif name.endswith(".csv"):
+        os.makedirs("outputs", exist_ok=True)
+        tmp = os.path.join("outputs", f"_doc_{uuid.uuid4().hex[:6]}.csv")
+        with open(tmp, "wb") as fh: fh.write(up.getbuffer())
+        try:
+            df, _ = load_table_with_notes(tmp)
+            text_cols = [c for c in df.columns
+                         if df[c].dtype == object
+                         and df[c].astype(str).str.len().mean() > 20]
+            if not text_cols:
+                st.error("No text-like column found in the CSV."); return
+            col = text_cols[0]
+            rows = df[col].dropna().astype(str).tolist()
+            pages = [(i + 1, txt) for i, txt in enumerate(rows) if txt.strip()]
+        except Exception as e:
+            st.error(f"Could not read CSV: {type(e).__name__}: {e}"); return
+    else:
+        text, err = _read_plain_text(up)
+        if not err:
+            pages = [(1, text)] if text.strip() else []
+
+    if err:
+        st.error(err); return
+    if not pages:
+        st.warning("No usable text found in the file."); return
+
+    chunks = _chunk_document(up.name, pages)
+    with st.spinner("Indexing document…"):
+        embedder, vectors = _build_index(chunks)
+
+    st.session_state["doc_pages"] = pages
+    st.session_state["doc_filename"] = up.name
+    st.session_state["doc_chunks"] = chunks
+    st.session_state["doc_embedder"] = embedder
+    st.session_state["doc_vectors"] = vectors
+    _reset_derived()
+    st.success(f"Indexed {len(pages)} pages → {len(chunks)} chunks from {up.name}")
 
 
 def _render_export():
     st.divider()
-    st.markdown(t("nlp_10_title"))
-    st.caption(t("nlp_10_caption"))
-    cleaned = st.session_state.get("nlp_cleaned") or st.session_state.get("nlp_input")
-    ex = (st.session_state.get("nlp_extractive") or {}).get("summary", "")
-    ab = (st.session_state.get("nlp_abstractive") or {}).get("summary", "")
-    stats = st.session_state.get("nlp_clean_stats") or {}
-    fmt = st.radio(t("nlp_export_fmt"),
-                   [t("nlp_export_excel"), t("nlp_export_sql"),
-                    t("nlp_export_txt")],
-                   horizontal=True, key="nlp_export_fmt")
-    row = {
-        "original_chars": len(st.session_state.get("nlp_input") or ""),
-        "cleaned_chars": len(cleaned or ""),
-        "reduction_pct": stats.get("reduction_pct", 0),
-        "extractive_summary": ex,
-        "abstractive_summary": ab,
-        "cleaned_text": (cleaned or "")[:50000],
-    }
-    if fmt == t("nlp_export_excel"):
+    st.markdown(t("doc_export_title"))
+    cleaned = (st.session_state.get("doc_cleaned")
+               or "\n\n".join(p for _, p in st.session_state.get("doc_pages") or []))
+    ex = (st.session_state.get("doc_extractive") or {}).get("summary", "")
+    ab = (st.session_state.get("doc_abstractive") or {}).get("summary", "")
+    stats = st.session_state.get("doc_clean_stats") or {}
+
+    fmt = st.radio(t("doc_export_format"),
+                    [t("doc_export_excel"), t("doc_export_sql"),
+                     t("doc_export_txt")],
+                    horizontal=True, key="doc_export_fmt")
+
+    row = {"filename": st.session_state.get("doc_filename", "document"),
+           "original_chars": sum(len(p) for _, p in st.session_state.get("doc_pages") or []),
+           "cleaned_chars": len(cleaned or ""),
+           "reduction_pct": stats.get("reduction_pct", 0),
+           "extractive_summary": ex,
+           "abstractive_summary": ab,
+           "cleaned_text": (cleaned or "")[:50000]}
+
+    if fmt == t("doc_export_excel"):
         try:
             buf = io.BytesIO()
             pd.DataFrame([row]).to_excel(buf, index=False, engine="openpyxl")
-            st.download_button(t("nlp_download_xlsx"), data=buf.getvalue(),
-                                file_name="archive.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button(t("doc_export_download_xlsx"),
+                                data=buf.getvalue(),
+                                file_name="doc_archive.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="doc_dl_xlsx")
         except ImportError:
-            st.warning(t("nlp_openpyxl_missing"))
-            st.download_button(t("nlp_download_csv"),
+            st.warning("Install `openpyxl` for Excel. Falling back to CSV.")
+            st.download_button(t("doc_export_download_csv"),
                                 data=pd.DataFrame([row]).to_csv(index=False).encode("utf-8"),
-                                file_name="archive.csv", mime="text/csv")
-    elif fmt == t("nlp_export_sql"):
+                                file_name="doc_archive.csv", mime="text/csv",
+                                key="doc_dl_csv")
+    elif fmt == t("doc_export_sql"):
         def esc(s): return str(s).replace("'", "''") if s else ""
-        sql = (
-            "CREATE TABLE IF NOT EXISTS documents (\n"
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
-            "  original_chars INTEGER, cleaned_chars INTEGER, reduction_pct REAL,\n"
-            "  extractive_summary TEXT, abstractive_summary TEXT, cleaned_text TEXT\n"
-            ");\n\n"
-            f"INSERT INTO documents VALUES (NULL, {row['original_chars']}, "
-            f"{row['cleaned_chars']}, {row['reduction_pct']}, "
-            f"'{esc(row['extractive_summary'])}', '{esc(row['abstractive_summary'])}', "
-            f"'{esc(row['cleaned_text'])}');"
-        )
+        sql = ("CREATE TABLE IF NOT EXISTS documents (\n"
+               "  id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+               "  filename TEXT, original_chars INTEGER, cleaned_chars INTEGER,\n"
+               "  reduction_pct REAL, extractive_summary TEXT,\n"
+               "  abstractive_summary TEXT, cleaned_text TEXT\n);\n\n"
+               f"INSERT INTO documents VALUES (NULL, '{esc(row['filename'])}', "
+               f"{row['original_chars']}, {row['cleaned_chars']}, {row['reduction_pct']}, "
+               f"'{esc(row['extractive_summary'])}', '{esc(row['abstractive_summary'])}', "
+               f"'{esc(row['cleaned_text'])}');")
         st.code(sql, language="sql")
-        st.download_button(t("nlp_download_sql"), data=sql.encode("utf-8"),
-                            file_name="archive.sql", mime="application/sql")
+        st.download_button(t("doc_export_download_sql"),
+                            data=sql.encode("utf-8"),
+                            file_name="doc_archive.sql", mime="application/sql",
+                            key="doc_dl_sql")
     else:
         bundle = (f"=== CLEANED TEXT ===\n{cleaned or ''}\n\n"
                   f"=== EXTRACTIVE SUMMARY ===\n{ex}\n\n"
                   f"=== ABSTRACTIVE SUMMARY ===\n{ab}\n")
-        st.download_button(t("nlp_download_txt"), data=bundle.encode("utf-8"),
-                            file_name="archive_bundle.txt", mime="text/plain")
+        st.download_button(t("doc_export_download_txt"),
+                            data=bundle.encode("utf-8"),
+                            file_name="doc_archive.txt", mime="text/plain",
+                            key="doc_dl_txt")
 
 
-def _resolve_cluster_docs(docs):
-    if len(docs) >= 3:
-        return docs
-    if len(docs) == 1:
-        with st.expander(t("nlp_cluster_split"), expanded=True):
-            method = st.radio(
-                t("nlp_cluster_split_label"),
-                [t("nlp_cluster_split_blank"),
-                 t("nlp_cluster_split_sent"),
-                 t("nlp_cluster_split_words")],
-                horizontal=False, key="split_method")
-            if method == t("nlp_cluster_split_blank"):
-                parts = [p.strip() for p in re.split(r"\n\s*\n", docs[0]) if p.strip()]
-            elif method == t("nlp_cluster_split_sent"):
-                parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", docs[0])
-                         if len(s.strip()) >= 20]
-            else:
-                n = st.slider(t("nlp_cluster_chunk"), 30, 300, 120, 10,
-                              key="chunk_size")
-                ws = docs[0].split()
-                parts = [" ".join(ws[i:i + n]) for i in range(0, len(ws), n)]
-            if len(parts) >= 3:
-                st.success(t("nlp_cluster_split_ok").format(n=len(parts)))
-                return parts
-            st.info(t("nlp_cluster_split_no").format(n=len(parts)))
-    return None
-
-
-def _handle_upload(up):
-    """Process an uploaded file ONLY when it actually changes."""
-    if up is None:
-        return
-    sig = (up.name, getattr(up, "size", None))
-    if st.session_state.get("_nlp_last_file_sig") == sig:
-        return
-    st.session_state["_nlp_last_file_sig"] = sig
-
-    name = up.name.lower()
-    if name.endswith(".csv"):
-        os.makedirs("outputs", exist_ok=True)
-        tmp = os.path.join("outputs", f"_nlp_{uuid.uuid4().hex[:6]}.csv")
-        with open(tmp, "wb") as fh:
-            fh.write(up.getbuffer())
-        try:
-            df, _ = load_table_with_notes(tmp)
-            text_cols = [c for c in df.columns if df[c].dtype == object]
-            if not text_cols:
-                st.error("No text-like column found in the CSV.")
-                return
-            col = st.selectbox("Which column holds the text?",
-                                text_cols, key="nlp_csv_col")
-            docs = df[col].dropna().astype(str).tolist()
-            st.session_state["nlp_input"] = "\n\n".join(docs)
-            st.session_state["nlp_docs"] = docs
-            _nlp_reset_derived()
-            st.success(f"Loaded {len(docs)} documents from column '{col}'")
-        except Exception as e:
-            st.error(f"Could not read CSV: {type(e).__name__}: {e}")
-    elif name.endswith(".pdf"):
-        text, err = _read_pdf(up)
-        if err:
-            st.error(err)
-        else:
-            st.session_state["nlp_input"] = text
-            st.session_state["nlp_docs"] = [text]
-            _nlp_reset_derived()
-            st.success(f"Loaded {len(text):,} chars from {up.name}")
-    elif name.endswith(".docx"):
-        text, err = _read_docx(up)
-        if err:
-            st.error(err)
-        else:
-            st.session_state["nlp_input"] = text
-            st.session_state["nlp_docs"] = [text]
-            _nlp_reset_derived()
-            st.success(f"Loaded {len(text):,} chars from {up.name}")
-    else:
-        text, err = _read_plain_text(up)
-        if err:
-            st.error(err)
-        else:
-            st.session_state["nlp_input"] = text
-            st.session_state["nlp_docs"] = [text] if text.strip() else []
-            _nlp_reset_derived()
-            st.success(f"Loaded {len(text):,} chars from {up.name}")
-
-
+# ============================================================
+# MAIN
+# ============================================================
 def render_tools():
-    _nlp_init()
-    ui.hero(
-        t("nlp_tools_hero_title"),
-        t("nlp_tools_hero_sub"),
-        pills=[t("nlp_tools_pill_1"), t("nlp_tools_pill_2"),
-               t("nlp_tools_pill_3"), t("nlp_tools_pill_4"),
-               t("nlp_tools_pill_5")],
-    )
+    _init_state()
 
-    # ---- 1. INPUT
-    st.markdown(t("nlp_1_title"))
-    tab_paste, tab_upload = st.tabs([t("nlp_paste_tab"), t("nlp_upload_tab")])
-    with tab_paste:
-        pasted = st.text_area("Paste the document",
-                               value=st.session_state.get("nlp_input") or "",
-                               height=220, key="nlp_paste_input",
-                               label_visibility="collapsed",
-                               placeholder=t("nlp_paste_placeholder"))
-        if pasted != (st.session_state.get("nlp_input") or ""):
-            st.session_state["nlp_input"] = pasted
-            st.session_state["nlp_docs"] = [pasted] if pasted.strip() else []
-            st.session_state["_nlp_last_file_sig"] = None
-            _nlp_reset_derived()
-    with tab_upload:
-        up = st.file_uploader(
-            t("nlp_upload_label"),
-            type=["txt", "md", "html", "htm", "pdf", "docx", "csv",
-                  "json", "log", "py", "rst"],
-            label_visibility="collapsed", key="nlp_upload")
-        _handle_upload(up)
+    ui.hero(t("doc_tools_hero_title"), t("doc_tools_hero_sub"),
+            pills=[t("doc_tools_pill_rag"), t("doc_tools_pill_cited"),
+                   t("doc_tools_pill_clean"), t("doc_tools_pill_summarize"),
+                   t("doc_tools_pill_cluster")])
 
-    text = st.session_state.get("nlp_input") or ""
-    docs = st.session_state.get("nlp_docs") or []
-    if not text.strip():
-        st.info(t("nlp_no_input"))
+    st.markdown(t("doc_upload_title"))
+    st.caption(t("doc_upload_hint"))
+    up = st.file_uploader(
+        "Upload document",
+        type=["pdf", "docx", "txt", "md", "html", "htm", "csv"],
+        label_visibility="collapsed", key="doc_uploader")
+    _ingest_file(up)
+
+    pages = st.session_state.get("doc_pages") or []
+    if not pages:
+        st.info(t("doc_upload_waiting"))
         return
-    st.caption(t("nlp_input_caption").format(
-        chars=len(text), docs=len(docs) if len(docs) > 1 else 1))
 
-    # ---- 2. CLEAN
+    _render_book_svg()
+
+    total_chars = sum(len(p) for _, p in pages)
+    full_text = "\n\n".join(p for _, p in pages)
+    st.caption(t("doc_indexed",
+                  name=st.session_state.get("doc_filename"),
+                  pages=len(pages), chars=total_chars,
+                  chunks=len(st.session_state.get("doc_chunks") or [])))
+
+    # ---- RAG ----
     st.divider()
-    st.markdown(t("nlp_2_title"))
-    st.caption(t("nlp_2_caption"))
-    with st.expander(t("nlp_clean_options"), expanded=True):
+    st.markdown(t("doc_rag_title"))
+    st.caption(t("doc_rag_sub"))
+
+    with st.expander(t("doc_rag_settings"), expanded=False):
+        st.info("🔒 Cloud embedding with your own API key is coming soon. "
+                 "The current version indexes locally using "
+                 "sentence-transformers (or TF-IDF as a fallback) — no API "
+                 "key needed.")
+        st.slider(t("doc_rag_top_k"), 2, 8, 4, key="rag_top_k")
+        if st.button(t("doc_rag_clear"), key="rag_clear_btn"):
+            st.session_state["doc_rag_history"] = []
+            st.rerun()
+
+    for turn in st.session_state["doc_rag_history"]:
+        if turn["role"] == "user":
+            st.markdown(
+                f'<div class="card" style="border-left:3px solid #00F0FF;">'
+                f'<p style="font-weight:600;margin-bottom:0.3rem;">'
+                f'{t("doc_rag_you")}</p>'
+                f'<p>{turn["text"]}</p></div>', unsafe_allow_html=True)
+        else:
+            cites = turn.get("citations", [])
+            cite_html = ""
+            if cites:
+                pills = "".join(
+                    f'<span class="pill">📎 {c["source"]} · page {c["page"]}</span>'
+                    for c in cites[:6])
+                cite_html = f'<div style="margin-top:0.5rem;">{pills}</div>'
+            st.markdown(
+                f'<div class="card" style="border-left:3px solid #D4AF37;">'
+                f'<p style="font-weight:600;margin-bottom:0.3rem;">'
+                f'{t("doc_rag_answer")}</p>'
+                f'<p>{turn["text"].replace(chr(10), "<br>")}</p>'
+                f'{cite_html}</div>', unsafe_allow_html=True)
+
+    with st.form("rag_form", clear_on_submit=True):
+        c1, c2 = st.columns([5, 1])
+        with c1:
+            q = st.text_input(t("doc_rag_ask_btn"),
+                              placeholder=t("doc_rag_input_placeholder"),
+                              label_visibility="collapsed", key="rag_query")
+        with c2:
+            sent = st.form_submit_button(t("doc_rag_ask_btn"),
+                                          use_container_width=True)
+
+    if sent and q.strip():
+        chunks = st.session_state.get("doc_chunks") or []
+        embedder = st.session_state.get("doc_embedder")
+        vectors = st.session_state.get("doc_vectors")
+        if not chunks or embedder is None:
+            st.warning(t("doc_rag_not_indexed"))
+        else:
+            with st.spinner(t("doc_rag_retrieving")):
+                retrieved = _retrieve(q.strip(), chunks, embedder, vectors,
+                                       top_k=st.session_state.get("rag_top_k", 4))
+            with st.spinner(t("doc_rag_writing")):
+                result = _answer_with_citations(q.strip(), retrieved)
+            st.session_state["doc_rag_history"].append(
+                {"role": "user", "text": q.strip()})
+            st.session_state["doc_rag_history"].append(
+                {"role": "assistant", "text": result["answer"],
+                 "citations": result["citations"]})
+            st.rerun()
+
+    # ---- Clean & tokenize ----
+    st.divider()
+    st.markdown(t("doc_clean_title"))
+    with st.expander(t("doc_clean_options"), expanded=False):
         c1, c2 = st.columns(2)
         with c1:
-            opt_lower = st.checkbox(t("nlp_opt_lower"), value=True, key="opt_lower")
-            opt_html = st.checkbox(t("nlp_opt_html"), value=True, key="opt_html")
-            opt_urls = st.checkbox(t("nlp_opt_urls"), value=True, key="opt_urls")
-            opt_emails = st.checkbox(t("nlp_opt_emails"), value=True, key="opt_emails")
+            opt_lower = st.checkbox("Lowercase", value=True, key="doc_opt_lower")
+            opt_html = st.checkbox("Strip HTML", value=True, key="doc_opt_html")
+            opt_urls = st.checkbox("Strip URLs", value=True, key="doc_opt_urls")
+            opt_emails = st.checkbox("Strip emails", value=True, key="doc_opt_emails")
         with c2:
-            opt_punct = st.checkbox(t("nlp_opt_punct"), value=False, key="opt_punct")
-            opt_digits = st.checkbox(t("nlp_opt_digits"), value=False, key="opt_digits")
-            opt_ws = st.checkbox(t("nlp_opt_ws"), value=True, key="opt_ws")
-            opt_stops = st.checkbox(t("nlp_opt_stops"), value=False, key="opt_stops")
+            opt_punct = st.checkbox("Strip punctuation", value=False, key="doc_opt_punct")
+            opt_digits = st.checkbox("Strip numbers", value=False, key="doc_opt_digits")
+            opt_ws = st.checkbox("Collapse whitespace", value=True, key="doc_opt_ws")
+            opt_stops = st.checkbox("Remove stop-words", value=False, key="doc_opt_stops")
 
-    current_opts = (opt_lower, opt_html, opt_urls, opt_emails,
-                    opt_punct, opt_digits, opt_ws, opt_stops)
-    current_hash = hash(current_opts)
-
-    stored_hash = st.session_state.get("_clean_hash")
-    if st.session_state.get("nlp_cleaned") and stored_hash is not None \
-            and stored_hash != current_hash:
-        st.warning(t("nlp_opt_changed"))
-
-    if st.button(t("nlp_clean_btn"), type="primary", key="btn_clean"):
+    if st.button(t("doc_clean_btn"), type="primary", key="doc_clean_btn"):
         cleaned, stats = clean_text(
-            text, lowercase=opt_lower, strip_html=opt_html,
+            full_text, lowercase=opt_lower, strip_html=opt_html,
             strip_urls=opt_urls, strip_emails=opt_emails,
             strip_punctuation=opt_punct, strip_digits=opt_digits,
             collapse_whitespace=opt_ws, remove_stopwords=opt_stops)
-        st.session_state["nlp_cleaned"] = cleaned
-        st.session_state["nlp_clean_stats"] = stats
-        st.session_state["_clean_hash"] = current_hash
-        for k in ("nlp_tokens", "nlp_extractive", "nlp_abstractive",
-                  "nlp_phrases", "nlp_clusters", "nlp_search_results",
-                  "nlp_docs_cleaned"):
-            st.session_state[k] = None
-        if len(docs) > 1:
-            cleaned_docs = [
-                clean_text(d, lowercase=opt_lower, strip_html=opt_html,
-                           strip_urls=opt_urls, strip_emails=opt_emails,
-                           strip_punctuation=opt_punct, strip_digits=opt_digits,
-                           collapse_whitespace=opt_ws,
-                           remove_stopwords=opt_stops)[0]
-                for d in docs]
-            st.session_state["nlp_docs_cleaned"] = cleaned_docs
+        st.session_state["doc_cleaned"] = cleaned
+        st.session_state["doc_clean_stats"] = stats
+        st.session_state["doc_tokens"] = None
 
-    cleaned = st.session_state.get("nlp_cleaned")
+    cleaned = st.session_state.get("doc_cleaned")
     if cleaned:
-        stats = st.session_state.get("nlp_clean_stats") or {}
-        counters = [
-            ("html_tags_removed", "HTML tags removed"),
-            ("urls_removed", "URLs removed"),
-            ("emails_removed", "Emails removed"),
-            ("control_chars_removed", "Control chars removed"),
-            ("punctuation_removed", "Punctuation marks removed"),
-            ("digit_runs_removed", "Number runs removed"),
-            ("stopwords_removed", "Stop-words removed"),
-        ]
-        active = [(k, l) for k, l in counters if stats.get(k, 0)]
+        stats = st.session_state.get("doc_clean_stats") or {}
         cols = st.columns(4)
-        col = 0
-        for k, l in active:
-            with cols[col % 4]:
-                ui.stat(stats[k], l)
-            col += 1
-        with cols[col % 4]:
-            ui.stat(f"{stats.get('reduction_pct', 0)}%", t("nlp_reduction"))
-        with st.expander(t("nlp_cleaned_title"), expanded=True):
-            st.text_area(t("nlp_cleaned_output"), value=cleaned, height=200,
-                         key=f"nlp_cleaned_view_{st.session_state.get('_clean_hash')}",
-                         label_visibility="collapsed")
+        with cols[0]: ui.stat(stats.get("original_chars", 0), t("doc_clean_original"))
+        with cols[1]: ui.stat(stats.get("cleaned_chars", 0), t("doc_clean_cleaned"))
+        with cols[2]: ui.stat(f"{stats.get('reduction_pct', 0)}%", t("doc_clean_reduced"))
+        with cols[3]: ui.stat(stats.get("stopwords_removed", 0), t("doc_clean_stopwords"))
 
-    # ---- 3. TOKENIZE
+        if st.button(t("doc_tokenize_btn"), key="doc_tokenize_btn"):
+            st.session_state["doc_tokens"] = tokenize(
+                cleaned, keep_stopwords=not opt_stops)
+        tokens = st.session_state.get("doc_tokens")
+        if tokens:
+            st.metric(t("doc_tokenize_count"), f"{len(tokens):,}")
+            counts = Counter(tokens).most_common(25)
+            if counts:
+                dfc = pd.DataFrame(counts, columns=["token", "count"])
+                fig = px.bar(dfc, x="count", y="token", orientation="h",
+                             color="count",
+                             color_continuous_scale=[[0, "#1c2540"], [1, "#22d3ee"]])
+                fig.update_layout(height=max(300, 22 * len(dfc)),
+                                  showlegend=False, margin=dict(t=10, b=10),
+                                  paper_bgcolor="rgba(0,0,0,0)",
+                                  plot_bgcolor="rgba(0,0,0,0)",
+                                  font=dict(color="#A1A1AA"))
+                fig.update_yaxes(autorange="reversed")
+                st.plotly_chart(fig, use_container_width=True)
+
+    # ---- Summarize ----
     st.divider()
-    st.markdown(t("nlp_3_title"))
-    st.caption(t("nlp_3_caption"))
+    st.markdown(t("doc_summarize_title"))
     c1, c2 = st.columns(2)
     with c1:
-        tok_keep_stops = st.checkbox(t("nlp_tok_keep_stops"), value=True,
-                                      key="tok_stops")
-        if st.button(t("nlp_tokenize_btn"), key="btn_tokenize"):
-            src = st.session_state.get("nlp_cleaned") or text
-            toks = tokenize(src, keep_stopwords=tok_keep_stops)
-            st.session_state["nlp_tokens"] = toks
-    tokens = st.session_state.get("nlp_tokens")
-    if tokens:
-        with c2:
-            st.metric(t("nlp_tokens"), f"{len(tokens):,}")
-        counts = Counter(tokens).most_common(30)
-        if counts:
-            dfc = pd.DataFrame(counts, columns=["token", "count"])
-            fig = px.bar(dfc, x="count", y="token", orientation="h",
-                         color="count",
-                         color_continuous_scale=[[0, "#1c2540"], [1, "#22d3ee"]])
-            fig.update_layout(height=max(300, 22 * len(dfc)),
-                              showlegend=False, margin=dict(t=10, b=10),
-                              paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#b6c2d4"))
-            fig.update_yaxes(autorange="reversed")
-            st.plotly_chart(fig, use_container_width=True)
-        with st.expander(t("nlp_all_tokens"), expanded=False):
-            st.write(" ".join(tokens[:500]) + (" …" if len(tokens) > 500 else ""))
-            st.caption(t("nlp_all_tokens_caption").format(n=len(tokens)))
+        st.markdown(t("doc_summarize_extractive"))
+        n_sent = st.slider(t("doc_summarize_sentences"), 1, 10, 3, key="doc_n_ex")
+        if st.button(t("doc_summarize_extract_btn"), key="doc_extract_btn"):
+            src = st.session_state.get("doc_cleaned") or full_text
+            st.session_state["doc_extractive"] = summarize_extractive(src, n=n_sent)
+        ex = st.session_state.get("doc_extractive")
+        if ex:
+            st.text_area("Summary", ex["summary"], height=140,
+                         key="doc_view_ex", label_visibility="collapsed")
+    with c2:
+        st.markdown(t("doc_summarize_abstractive"))
+        target_words = st.slider(t("doc_summarize_target_words"),
+                                  30, 250, 80, 10, key="doc_n_ab")
+        if st.button(t("doc_summarize_generate_btn"), key="doc_abstract_btn"):
+            src = st.session_state.get("doc_cleaned") or full_text
+            with st.spinner(t("doc_summarize_summarizing")):
+                st.session_state["doc_abstractive"] = summarize_abstractive(
+                    src, target_words=target_words)
+        ab = st.session_state.get("doc_abstractive")
+        if ab:
+            st.text_area("Summary", ab["summary"], height=140,
+                         key="doc_view_ab", label_visibility="collapsed")
 
-    # ---- 4. KEY PHRASES
+    # ---- Key phrases ----
     st.divider()
-    st.markdown(t("nlp_4_title"))
-    if st.button(t("nlp_phrases_btn"), key="btn_phrases"):
-        src = st.session_state.get("nlp_cleaned") or text
-        st.session_state["nlp_phrases"] = key_phrases(src, n=15)
-    phrases = st.session_state.get("nlp_phrases")
+    st.markdown(t("doc_phrases_title"))
+    if st.button(t("doc_phrases_btn"), key="doc_phrases_btn"):
+        src = st.session_state.get("doc_cleaned") or full_text
+        st.session_state["doc_phrases"] = key_phrases(src, n=15)
+    phrases = st.session_state.get("doc_phrases")
     if phrases:
         cols = st.columns(3)
         for i, item in enumerate(phrases):
@@ -403,369 +613,87 @@ def render_tools():
                 st.markdown(
                     f'<div class="card" style="padding:0.6rem 0.9rem;'
                     f'display:flex;justify-content:space-between;">'
-                    f'<span style="color:#7ee0c0;">{item["phrase"]}</span>'
-                    f'<span style="color:#7f8b99;">×{item["count"]}</span></div>',
+                    f'<span>{item["phrase"]}</span>'
+                    f'<span style="opacity:0.6;">×{item["count"]}</span></div>',
                     unsafe_allow_html=True)
 
-    # ---- 5. SUMMARIZE
+    # ---- Clustering ----
     st.divider()
-    st.markdown(t("nlp_5_title"))
+    st.markdown(t("doc_cluster_title"))
+    if len(pages) >= 3:
+        k = st.slider(t("doc_cluster_topics"), 2, min(10, len(pages) - 1),
+                      min(4, max(2, len(pages) // 5)), key="doc_k")
+        if st.button(t("doc_cluster_btn"), key="doc_cluster_btn"):
+            texts = [p for _, p in pages]
+            with st.spinner(t("doc_cluster_clustering")):
+                st.session_state["doc_clusters"] = cluster_documents(texts, n_clusters=k)
+        res = st.session_state.get("doc_clusters")
+        if res:
+            st.markdown(f"**{res['n_clusters']} topics** · "
+                        f"silhouette **{res['silhouette']}**")
+            for i in range(res["n_clusters"]):
+                st.markdown(
+                    f'<div class="card" style="padding:0.7rem 1rem;">'
+                    f'<h4>{t("doc_cluster_topic_n", i=i+1)} '
+                    f'<span class="pill">{t("doc_cluster_docs", n=res["sizes"][i])}</span></h4>'
+                    f'<p>{", ".join(res["top_terms"][i][:6])}</p></div>',
+                    unsafe_allow_html=True)
+    else:
+        st.info(t("doc_cluster_need_three"))
+
+    # ---- Search ----
+    st.divider()
+    st.markdown(t("doc_search_title"))
+    q = st.text_input(t("doc_search_title"),
+                       placeholder=t("doc_search_placeholder"),
+                       key="doc_search_q", label_visibility="collapsed")
+    if q and st.button(t("doc_search_btn"), key="doc_search_btn"):
+        vec = mat = None
+        if st.session_state.get("doc_clusters"):
+            vec = st.session_state["doc_clusters"].get("vectorizer")
+            mat = st.session_state["doc_clusters"].get("matrix")
+        results = search_documents(q, [p for _, p in pages], top_k=5,
+                                     vectorizer=vec, matrix=mat)
+        st.session_state["doc_search_results"] = results
+    results = st.session_state.get("doc_search_results")
+    if results:
+        for r in results:
+            st.markdown(
+                f'<div class="card" style="padding:0.8rem 1rem;">'
+                f'<span class="pill">score {r["score"]}</span>'
+                f'<p style="margin-top:0.5rem;">{r["text"]}</p></div>',
+                unsafe_allow_html=True)
+
+    # ---- Translate & grammar ----
+    st.divider()
+    st.markdown(t("doc_translate_title"))
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown(t("nlp_extractive_title"))
-        n_sent = st.slider(t("nlp_sentences"), 1, 10, 3, key="n_ex")
-        if st.button(t("nlp_extract_btn"), key="btn_ex"):
-            src = st.session_state.get("nlp_cleaned") or text
-            st.session_state["nlp_extractive"] = summarize_extractive(src, n=n_sent)
-        ex = st.session_state.get("nlp_extractive")
-        if ex:
-            st.text_area(t("nlp_extractive_output"), ex["summary"], height=140,
-                         key="view_ex", label_visibility="collapsed")
-            st.caption(f"_{ex['note']}_")
+        lang = st.selectbox(t("doc_translate_lang"),
+                             ["Spanish", "French", "German", "Italian",
+                              "Portuguese", "Arabic", "Chinese (Simplified)",
+                              "Japanese", "Hindi", "Russian"],
+                             key="doc_lang")
+        if st.button(t("doc_translate_btn"), key="doc_translate_btn"):
+            with st.spinner(t("doc_translate_translating", lang=lang)):
+                st.session_state["doc_translation"] = translate(
+                    st.session_state.get("doc_cleaned") or full_text, lang)
     with c2:
-        st.markdown(t("nlp_abstractive_title"))
-        target_words = st.slider(t("nlp_approx_words"), 30, 200, 80, 10, key="n_ab")
-        if st.button(t("nlp_abstract_btn"), key="btn_ab"):
-            src = st.session_state.get("nlp_cleaned") or text
-            with st.spinner(t("nlp_summarizing")):
-                st.session_state["nlp_abstractive"] = summarize_abstractive(
-                    src, target_words=target_words)
-        ab = st.session_state.get("nlp_abstractive")
-        if ab:
-            st.text_area(t("nlp_abstractive_output"), ab["summary"], height=140,
-                         key="view_ab", label_visibility="collapsed")
-            st.caption(f"_{ab['note']}_")
+        if st.button(t("doc_grammar_btn"), key="doc_grammar_btn"):
+            with st.spinner(t("doc_grammar_correcting")):
+                st.session_state["doc_grammar"] = fix_grammar(
+                    st.session_state.get("doc_cleaned") or full_text)
 
-    # ---- 6. CLUSTERING
-    st.divider()
-    st.markdown(t("nlp_6_title"))
-    st.caption(t("nlp_6_caption"))
-    cluster_src = _resolve_cluster_docs(docs)
-    if cluster_src is None or len(cluster_src) < 3:
-        st.info(t("nlp_cluster_need_3"))
-    else:
-        cc1, cc2 = st.columns([1, 2])
-        with cc1:
-            k = st.slider(t("nlp_topics_count"), 2, min(10, len(cluster_src) - 1),
-                          min(4, max(2, len(cluster_src) // 5)), key="n_clusters")
-            if st.button(t("nlp_cluster_btn"), key="btn_cluster"):
-                src_docs = st.session_state.get("nlp_docs_cleaned") or cluster_src
-                with st.spinner(t("nlp_clustering")):
-                    st.session_state["nlp_clusters"] = cluster_documents(
-                        src_docs, n_clusters=k)
-        with cc2:
-            res = st.session_state.get("nlp_clusters")
-            if res:
-                st.markdown(t("nlp_topics_prefix").format(
-                    n=res["n_clusters"], sil=res["silhouette"]))
-                for i in range(res["n_clusters"]):
-                    st.markdown(
-                        f'<div class="card" style="padding:0.7rem 1rem;">'
-                        f'<h4>{t("nlp_topic").format(i=i+1)} '
-                        f'<span class="pill">{t("nlp_topic_docs").format(n=res["sizes"][i])}</span></h4>'
-                        f'<p style="color:#7ee0c0;">{", ".join(res["top_terms"][i][:6])}</p></div>',
-                        unsafe_allow_html=True)
-
-    # ---- 7. SEARCH
-    st.divider()
-    st.markdown(t("nlp_7_title"))
-    if len(docs) >= 1 or cluster_src:
-        q = st.text_input(t("nlp_search_results"),
-                           placeholder=t("nlp_search_placeholder"),
-                           key="nlp_search_query")
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            top_k = st.slider(t("nlp_search_results"), 1, 10, 5, key="n_search")
-        with c2:
-            if st.button(t("nlp_search_btn"), key="btn_search"):
-                search_pool = cluster_src or docs
-                src_docs = st.session_state.get("nlp_docs_cleaned") or search_pool
-                vec = mat = None
-                if st.session_state.get("nlp_clusters"):
-                    vec = st.session_state["nlp_clusters"].get("vectorizer")
-                    mat = st.session_state["nlp_clusters"].get("matrix")
-                st.session_state["nlp_search_results"] = search_documents(
-                    q, src_docs, top_k=top_k, vectorizer=vec, matrix=mat)
-        results = st.session_state.get("nlp_search_results")
-        if results:
-            for r in results:
-                st.markdown(
-                    f'<div class="card" style="padding:0.8rem 1rem;">'
-                    f'<div style="display:flex;justify-content:space-between;">'
-                    f'<span class="pill">{t("nlp_search_score").format(s=r["score"])}</span>'
-                    f'<span style="color:#7f8b99;font-size:0.8rem;">'
-                    f'{t("nlp_search_doc").format(i=r["index"])}</span></div>'
-                    f'<p style="margin-top:0.5rem;">{r["text"]}</p></div>',
-                    unsafe_allow_html=True)
-        elif results is not None:
-            st.info(t("nlp_search_none"))
-
-    # ---- 8. TRANSLATE
-    st.divider()
-    st.markdown(t("nlp_8_title"))
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        lang = st.selectbox(t("nlp_lang_label"),
-                             ["Spanish", "French", "German", "Italian", "Portuguese",
-                              "Arabic", "Chinese (Simplified)", "Japanese", "Hindi",
-                              "Urdu", "Russian"], key="nlp_lang")
-        if st.button(t("nlp_translate_btn"), key="btn_tr"):
-            with st.spinner(t("nlp_translating").format(lang=lang)):
-                st.session_state["nlp_translation"] = translate(text, lang)
-            st.rerun()
-    with c2:
-        tr = st.session_state.get("nlp_translation")
-        if tr:
-            st.text_area(t("nlp_translation_output"), tr["translation"],
-                         height=180, key="view_tr", label_visibility="collapsed")
-            st.caption(f"_{tr['note']}_")
-
-    # ---- 9. GRAMMAR
-    st.divider()
-    st.markdown(t("nlp_9_title"))
-    if st.button(t("nlp_grammar_btn"), key="btn_gr"):
-        with st.spinner(t("nlp_correcting")):
-            st.session_state["nlp_grammar"] = fix_grammar(text)
-    gr = st.session_state.get("nlp_grammar")
+    tr = st.session_state.get("doc_translation")
+    if tr:
+        st.text_area("Translation", tr["translation"], height=160,
+                     key="doc_view_tr", label_visibility="collapsed")
+    gr = st.session_state.get("doc_grammar")
     if gr:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(t("nlp_original"))
-            st.text_area(t("nlp_original"), text, height=220,
-                         key="view_gr_orig", label_visibility="collapsed")
-        with c2:
-            st.markdown(t("nlp_corrected"))
-            st.text_area(t("nlp_corrected"), gr["fixed"], height=220,
-                         key="view_gr_fixed", label_visibility="collapsed")
-        st.caption(f"_{gr['note']}_")
+        st.text_area("Corrected", gr["fixed"], height=160,
+                     key="doc_view_gr", label_visibility="collapsed")
 
     _render_export()
 
 
-# ============================================================ DASHBOARD
-def _load_any_document(uploaded):
-    name = uploaded.name.lower()
-    if name.endswith(".csv"):
-        os.makedirs("outputs", exist_ok=True)
-        tmp = os.path.join("outputs", f"_dash_{uuid.uuid4().hex[:6]}.csv")
-        with open(tmp, "wb") as fh:
-            fh.write(uploaded.getbuffer())
-        try:
-            df, _ = load_table_with_notes(tmp)
-            return df, "csv", None
-        except Exception as e:
-            return None, None, f"CSV: {type(e).__name__}: {e}"
-    if name.endswith(".pdf"):
-        text, err = _read_pdf(uploaded)
-        if err:
-            return None, None, err
-        return text, "single", None
-    if name.endswith(".docx"):
-        text, err = _read_docx(uploaded)
-        if err:
-            return None, None, err
-        return text, "single", None
-    text, err = _read_plain_text(uploaded)
-    if err:
-        return None, None, err
-    return text, "single", None
-
-
-def _word_cloud_png(text):
-    try:
-        from wordcloud import WordCloud
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        wc = WordCloud(width=900, height=420, background_color="#0a0e14",
-                       colormap="cool", max_words=120, stopwords=STOP_WORDS,
-                       prefer_horizontal=0.9).generate(text or "")
-        fig, ax = plt.subplots(figsize=(10, 4.5), facecolor="#0a0e14")
-        ax.imshow(wc, interpolation="bilinear"); ax.axis("off")
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight", facecolor="#0a0e14")
-        plt.close(fig)
-        return buf.getvalue()
-    except Exception:
-        return None
-
-
-def _top_ngrams(texts, n=15, ngram=2):
-    tokens_per_doc = []
-    for txt in texts:
-        words = re.findall(r"[a-zA-Z']+", (txt or "").lower())
-        words = [w for w in words if len(w) > 2 and w not in STOP_WORDS]
-        tokens_per_doc.append(words)
-    counts = Counter()
-    for tokens in tokens_per_doc:
-        for i in range(len(tokens) - ngram + 1):
-            counts[" ".join(tokens[i:i + ngram])] += 1
-    return [{"ngram": k, "count": v} for k, v in counts.most_common(n)]
-
-
-def _split_into_docs_single(text, method, chunk_size=200):
-    if method.startswith("paragraphs") or method.startswith("فقرات"):
-        parts = [p.strip() for p in re.split(r"\n\s*\n", text) if len(p.strip()) > 40]
-    elif method.startswith("sentences") or method.startswith("جمل"):
-        parts = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text)
-                 if len(s.strip()) >= 40]
-    else:
-        ws = text.split()
-        parts = [" ".join(ws[i:i + chunk_size])
-                 for i in range(0, len(ws), chunk_size) if ws[i:i + chunk_size]]
-    return parts
-
-
-def render_dashboard():
-    from llm import ask
-    ui.hero(
-        t("nlp_dash_hero_title"),
-        t("nlp_dash_hero_sub"),
-        pills=[t("nlp_dash_pill_1"), t("nlp_dash_pill_2"),
-               t("nlp_dash_pill_3")],
-    )
-
-    up = st.file_uploader(t("nlp_dash_upload"),
-                           type=["csv", "pdf", "docx", "txt", "md", "html", "htm"],
-                           key="dash_upload", label_visibility="collapsed")
-
-    if up is None:
-        if st.session_state.get("nlp_docs"):
-            st.info(t("nlp_dash_use_loaded"))
-            if st.button(t("nlp_dash_use_loaded_btn"), type="primary"):
-                st.session_state["dash_docs"] = st.session_state["nlp_docs"]
-                st.rerun()
-        return
-
-    data, kind, err = _load_any_document(up)
-    if err:
-        st.error(f"Could not read the file: {err}")
-        return
-
-    if kind == "csv":
-        df = data
-        text_cols = [c for c in df.columns
-                     if df[c].dtype == object
-                     and df[c].astype(str).str.len().mean() > 20]
-        if not text_cols:
-            st.error("No text-like column found in the CSV.")
-            return
-        col = st.selectbox(t("nlp_dash_csv_pick"), text_cols,
-                           key="dash_col_pick")
-        docs = [d for d in df[col].dropna().astype(str).tolist() if d.strip()]
-    else:
-        text = data
-        st.caption(f"Loaded {len(text):,} characters from {up.name}.")
-        method = st.radio(
-            t("nlp_dash_split_label"),
-            [t("nlp_dash_split_1"), t("nlp_dash_split_2"), t("nlp_dash_split_3")],
-            horizontal=True, key="dash_split")
-        chunk = 200
-        if method == t("nlp_dash_split_3"):
-            chunk = st.slider(t("nlp_dash_chunk"), 50, 500, 200, 10,
-                              key="dash_chunk")
-        docs = _split_into_docs_single(text, method, chunk)
-        st.caption(t("nlp_dash_split_ok").format(n=len(docs)))
-
-    if not docs:
-        st.warning("Nothing usable found in that file.")
-        return
-
-    st.caption(f"{len(docs)} documents · {sum(len(d) for d in docs):,} characters.")
-
-    st.divider()
-    lengths = [len(d.split()) for d in docs]
-    vocab = set()
-    for d in docs:
-        for w in re.findall(r"[a-zA-Z']+", d.lower()):
-            if w not in STOP_WORDS and len(w) > 2:
-                vocab.add(w)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: ui.stat(len(docs), t("nlp_dash_stat_docs"))
-    with c2: ui.stat(f"{sum(lengths):,}", t("nlp_dash_stat_words"))
-    with c3: ui.stat(int(sum(lengths) / len(lengths)), t("nlp_dash_stat_avg"))
-    with c4: ui.stat(f"{len(vocab):,}", t("nlp_dash_stat_vocab"))
-
-    st.divider()
-    st.markdown(t("nlp_dash_wordcloud"))
-    png = _word_cloud_png(" ".join(docs))
-    if png:
-        st.image(png, use_container_width=True)
-    else:
-        st.info(t("nlp_dash_wc_missing"))
-
-    st.divider()
-    st.markdown(t("nlp_dash_sentiment"))
-    st.caption(t("nlp_dash_sentiment_caption"))
-    with st.spinner(t("nlp_dash_scoring")):
-        try:
-            sample = docs[:15]
-            joined = "\n".join(f"{i+1}. {txt[:400]}" for i, txt in enumerate(sample))
-            reply = (ask("For each numbered text below give -1 (negative), 0 (neutral) "
-                          "or +1 (positive). Return ONLY a JSON array of integers.\n\n"
-                          + joined, temperature=0.1) or "").strip()
-            s, e = reply.find("["), reply.rfind("]")
-            scores = json.loads(reply[s:e+1])[:len(sample)]
-            method = "LLM"
-        except Exception:
-            scores = None
-            method = "unavailable"
-    if scores is None:
-        st.info(t("nlp_dash_llm_unavail"))
-    else:
-        label_map = {-1: "negative", 0: "neutral", 1: "positive"}
-        label_counts = Counter(label_map.get(int(s), "neutral") for s in scores)
-        colors = {"positive": "#4ade80", "neutral": "#94a3b8", "negative": "#f43f5e"}
-        fig = px.bar(x=list(label_counts.keys()), y=list(label_counts.values()),
-                     color=list(label_counts.keys()), color_discrete_map=colors,
-                     text=list(label_counts.values()))
-        fig.update_layout(height=340, showlegend=False,
-                          xaxis_title="sentiment", yaxis_title="documents",
-                          margin=dict(t=10, b=10),
-                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#b6c2d4"))
-        fig.update_traces(textposition="outside")
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption(t("nlp_dash_sent_method").format(m=method, n=len(scores)))
-
-    st.divider()
-    st.markdown(t("nlp_dash_length"))
-    fig = px.histogram(x=lengths, nbins=30, color_discrete_sequence=["#22d3ee"],
-                       labels={"x": t("nlp_dash_length_x"),
-                               "y": t("nlp_dash_length_y")})
-    fig.update_layout(height=340, showlegend=False, margin=dict(t=10, b=10),
-                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#b6c2d4"))
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-    st.markdown(t("nlp_dash_bigrams"))
-    bigrams = _top_ngrams(docs, n=15, ngram=2)
-    if bigrams:
-        dfb = pd.DataFrame(bigrams)
-        fig = px.bar(dfb, x="count", y="ngram", orientation="h", color="count",
-                     color_continuous_scale=[[0, "#1c2540"], [1, "#e879f9"]])
-        fig.update_layout(height=max(340, 24 * len(dfb)), showlegend=False,
-                          margin=dict(t=10, b=10),
-                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#b6c2d4"))
-        fig.update_yaxes(autorange="reversed")
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-    st.markdown(t("nlp_dash_vocab_growth"))
-    seen = set(); vocab_by_doc = []
-    for d in docs:
-        for w in re.findall(r"[a-zA-Z']+", d.lower()):
-            if w not in STOP_WORDS and len(w) > 2:
-                seen.add(w)
-        vocab_by_doc.append(len(seen))
-    fig = px.line(x=list(range(1, len(docs) + 1)), y=vocab_by_doc,
-                  labels={"x": t("nlp_dash_vocab_x"),
-                          "y": t("nlp_dash_vocab_y")},
-                  color_discrete_sequence=["#22d3ee"])
-    fig.update_layout(height=320, margin=dict(t=10, b=10),
-                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#b6c2d4"))
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption(t("nlp_dash_vocab_caption"))
+render_dashboard = render_tools

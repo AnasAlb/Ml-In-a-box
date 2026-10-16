@@ -1,28 +1,30 @@
-# Virtual Environment
+# Environment
 .venv/
 venv/
 env/
+.env
+
+# Streamlit secrets (API keys — NEVER commit)
+.streamlit/secrets.toml
 
 # Outputs and saved models
 outputs/
+!outputs/.gitkeep
 *.joblib
 *.pkl
 *.pt
 *.h5
-
-# Large datasets
-*.csv
-*.xlsx
-*.zip
 
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 
-# Environment variables
-.env
+# IDE
+.vscode/
+.idea/
 
 # OS files
 .DS_Store
