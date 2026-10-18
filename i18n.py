@@ -56,41 +56,47 @@ LANGS = {
         "tut_go_knowledge": "📖  Open the Knowledge Tree",
         "tut_warning": "⚠️ Review this before using the generated agent.",
 
-        # ================================================== ABOUT
-        "about_hero_title": "About",
-        "about_hero_sub": "What this project is, what it isn't, and who built it.",
-        "about_pill_1": "student project", "about_pill_2": "agentic pipeline",
-        "about_pill_3": "two engineers",
-        "about_what_title": "🎯 What it is",
-        "about_what_body": ("ML in a Box is a student project for the AI & "
-                             "Machine Learning track. It wraps a language model "
-                             "around a standard ML pipeline and asks a simple "
-                             "question: what would it look like if the decisions "
-                             "came from an LLM, while the execution stayed in "
-                             "code you can read?"),
-        "about_not_title": "🛑 What it isn't",
-        "about_not_body": ("Not a production system. Not a fine-tuned model. "
-                            "Not a replacement for a data scientist. It's a "
-                            "working pipeline with an agentic layer on top."),
-        "about_stack_title": "🧱 The stack",
-        "about_stack_body": ("LangGraph holds the state machine and the human "
-                              "checkpoint. scikit-learn and PyTorch train the "
-                              "models. Streamlit is the interface. An "
-                              "OpenAI-compatible LLM handles the four decision "
-                              "nodes."),
-        "about_decides_title": "🧠 How it decides",
-        "about_decides_body": ("Four decisions come from the language model: "
-                                "the target column, the interaction features, "
-                                "the model set, and the repair action after "
-                                "training. Every one of them has a rule-based "
-                                "fallback, so the pipeline still runs when the "
-                                "LLM is unavailable."),
-        "about_team_title": "The team",
-        "about_role_anas": "Gamer, unwilling translator and professional big back",
+        # ================================================== ABOUT (NARRATIVE)
+        "about_hero_title": "Our Story",
+        "about_hero_sub": "How ML in a Box came to life, the late nights, and why we built it.",
+        "about_pill_1": "student project", "about_pill_2": "late nights",
+        "about_pill_3": "sleepless coding",
+        "about_what_title": "💡 Why we built this",
+        "about_what_body": (
+            "We noticed that training a machine learning model is often a black box. "
+            "You run a script, numbers appear, and you hope for the best. We wanted "
+            "to build a tool that explains *why* decisions are made. 'ML in a Box' "
+            "was born out of a desire to make AI accessible, transparent, and actually "
+            "fun to use. It wraps a standard ML pipeline with an AI agent that talks "
+            "to you, validates its own steps, and shows you exactly what it's doing."
+        ),
+        "about_not_title": "🛑 The Reality Check",
+        "about_not_body": (
+            "This is not a multi-million dollar enterprise product. It is a passion "
+            "project built by two engineering students. It has bugs, it has quirks, "
+            "but it represents hundreds of hours of learning, debugging, and iterating. "
+            "It's a testament to what you can build when you refuse to give up on a good idea."
+        ),
+        "about_stack_title": "🧱 The Tech Stack",
+        "about_stack_body": (
+            "We used LangGraph to orchestrate the agentic workflow (the 'brain'). "
+            "Under the hood, scikit-learn and PyTorch do the heavy lifting for the models. "
+            "Streamlit provides the interface, turning Python scripts into an interactive "
+            "web app. Finally, an OpenAI-compatible LLM acts as the reasoning engine."
+        ),
+        "about_decides_title": "🧠 The Human-in-the-Loop",
+        "about_decides_body": (
+            "We didn't want an AI that just runs wild. We built 'checkpoints'. The AI "
+            "proposes a cleaning plan, but it pauses and asks for your approval before "
+            "touching your data. If the model performs poorly, the AI reviews the leaderboard "
+            "and suggests a fix — but you always have the final say."
+        ),
+        "about_team_title": "Meet the Engineers",
+        "about_role_anas": "Gamer, unwilling translator, and professional big back.",
         "about_role_muad": "Professional Anime watcher and phenomenal strategist.",
-        "about_btn_tutorial": "📚  Tutorial",
-        "about_btn_knowledge": "📖  Knowledge Tree",
-        "about_btn_start": "🔎  Start with a dataset",
+        "about_btn_tutorial": "📚  Read the Tutorial",
+        "about_btn_knowledge": "📖  Explore the Knowledge Tree",
+        "about_btn_start": "🔎  Start Your First Project",
 
         # ================================================== CHAT
         "chat_hero_title": "Ask",
@@ -163,6 +169,7 @@ LANGS = {
         "prof_reupload_btn": "↺  Upload a different file",
         "prof_upload_model_tab": "📦  Upload Model",
         "prof_upload_dataset_tab": "📊  Upload Dataset",
+        "prof_upload_cv_tab": "👁️  Computer Vision",
         "prof_model_intro_title": "📦 Upload a saved model",
         "prof_model_intro_body": ("Upload a .zip bundle that was downloaded "
                                    "from the results page of this app."),
@@ -304,6 +311,8 @@ LANGS = {
         "train_stopped": "Training stopped: {err}",
         "train_back": "← Back",
         "train_retry_spinner": "Retrying with the {n} most informative features: {feats}",
+        "train_game_title": "🎮 While you wait, play Tic-Tac-Toe!",
+        "train_game_caption": "The agent is training your models in the background. Try to beat the unbeatable AI.",
 
         # ================================================== RESULTS
         "results_title": "### Results",
@@ -642,13 +651,95 @@ LANGS = {
         "nn_no_torch": "⚪ PyTorch not installed — using scikit-learn MLP.",
         "nn_layers_error": "Layers must be numbers separated by commas.",
 
+        # ================================================== CV (COMPUTER VISION)
+        "cv_hero_title": "Computer Vision",
+        "cv_hero_sub": "Upload an image dataset, train a classifier, or try zero-shot object detection.",
+        "cv_pill_1": "image classification", "cv_pill_2": "YOLOv8 detection",
+        "cv_pill_3": "deep learning", "cv_pill_4": "live webcam",
+        "cv_tab_class": "Classification",
+        "cv_tab_detect": "Detection (YOLOv8)",
+        "cv_tab_seg": "Segmentation",
+        "cv_sec_1": "### 1. Upload dataset",
+        "cv_zip_title": "Image dataset (.zip)",
+        "cv_zip_body": "Upload a ZIP file where each folder is a class. e.g. cats/, dogs/.",
+        "cv_zip_min": "Minimum 2 images per class.",
+        "cv_zip_upload": "Drop a .zip file here",
+        "cv_zip_extract": "Extracting and reading classes...",
+        "cv_zip_fail": "Could not find at least 2 class folders in this zip.",
+        "cv_stat_classes": "Classes",
+        "cv_stat_train": "Train images",
+        "cv_stat_val": "Validation images",
+        "cv_classes_prefix": "Classes: ",
+        "cv_diff_dataset": "Upload a different dataset",
+        "cv_sec_2": "### 2. Choose architecture",
+        "cv_suggested_backbone": "Suggested: **{name}**. {reason}",
+        "cv_backbone": "Backbone",
+        "cv_custom_caption": "Build a custom CNN from scratch.",
+        "cv_sec_3": "### 3. Training configuration",
+        "cv_epochs": "Epochs",
+        "cv_lr": "Learning rate",
+        "cv_bs": "Batch size",
+        "cv_freeze": "Freeze backbone",
+        "cv_freeze_help": "Only train the final classifier head. Speeds up training.",
+        "cv_sec_4": "### 4. Start training",
+        "cv_start_btn": "🚀 Train model",
+        "cv_training": "Training...",
+        "cv_progress_epoch": "Epoch {e}/{n}",
+        "cv_progress_line": "Epoch {e}: train loss = {tl:.3f}, val loss = {vl:.3f}, val acc = {va:.2%}",
+        "cv_evaluating": "Evaluating...",
+        "cv_sec_5": "### 5. Results",
+        "cv_val_acc": "Validation Accuracy",
+        "cv_architecture": "Architecture",
+        "cv_confusion": "Confusion Matrix",
+        "cv_per_class": "Per-class metrics",
+        "cv_sample_preds": "Sample predictions",
+        "cv_predict_title": "### 🔮 Try the model",
+        "cv_predict_using": "Using model: {m}",
+        "cv_predict_loaded": " (loaded from disk)",
+        "cv_predict_fail": "Prediction failed: {err}",
+        "cv_predict_label": "Prediction",
+        "cv_predict_conf": "Confidence: {c:.1f}%",
+        "cv_saved_title": "### 💾 Saved models",
+        "cv_saved_caption": "You can save up to {n} models.",
+        "cv_saved_already": "Model already saved in this session.",
+        "cv_saved_full": "Storage full ({n}/{n}). Delete a model to save a new one.",
+        "cv_saved_name_label": "Name this model",
+        "cv_saved_name_placeholder": "e.g. Cats vs Dogs v1",
+        "cv_saved_save_btn": "Save model ({cur}/{max})",
+        "cv_saved_confirm_flash": "Model saved successfully.",
+        "cv_saved_train_first": "Train a model first to save it.",
+        "cv_saved_in_use": "in use",
+        "cv_saved_val_acc": "Accuracy: {p:.1f}%",
+        "cv_saved_saved_at": "Saved: {when}",
+        "cv_saved_size": "Size: {mb} MB",
+        "cv_saved_load": "Load",
+        "cv_saved_loading": "Loading model...",
+        "cv_saved_load_flash": "Loaded {m}.",
+        "cv_saved_delete": "Delete",
+        "cv_saved_confirm": "Confirm",
+        "cv_saved_confirm_warn": "⚠️ Are you sure? This cannot be undone.",
+        "cv_saved_cancel": "Cancel",
+        "cv_detect_wip_title": "🚧 Zero-Shot Detection",
+        "cv_detect_wip_body": "Use YOLOv8 to detect objects without training.",
+        "cv_detect_wip_body2": "Upload an image in the box above.",
+        "cv_detect_wip_foot": "Powered by ultralytics.",
+        "cv_detect_arch_title": "Available models",
+        "cv_detect_locked": "Detection is ready to use.",
+        "cv_seg_wip_title": "🚧 Segmentation",
+        "cv_seg_wip_body": "Pixel-level classification. Coming soon.",
+        "cv_seg_wip_body2": "We are working on integrating SAM and U-Net.",
+        "cv_seg_wip_foot": "Stay tuned.",
+        "cv_seg_arch_title": "Planned architectures",
+        "cv_seg_locked": "Segmentation is locked for this build.",
+
         # ================================================== MISC
         "theme_dark": "Dark",
         "theme_light": "Light",
     },
-
+    
     "ar": {
-        # ================================================== NAV
+        # ... [Keep Arabic translations exactly as they were from the previous i18n.py] ...
+        # Since you requested full replacements, I've included the updated Arabic keys.
         "language": "اللغة",
         "home": "الرئيسية", "about": "حول", "tutorial": "الشرح",
         "profile": "محلّل البيانات", "run": "تشغيل المسار",
@@ -656,8 +747,6 @@ LANGS = {
         "agent_builder": "منشئ الوكيل", "knowledge": "المعرفة",
         "chat": "اسأل", "glossary": "المعجم",
         "reset": "إعادة", "sign_out": "خروج", "signed_in": "مسجّل الدخول",
-
-        # ================================================== HOME
         "hero_title": "التعلّم الآلي في صندوق",
         "hero_sub": ("قوة الذكاء الاصطناعي في شاشة واحدة. ارفع مجموعة بيانات، "
                      "دع الوكيل يصمّم المسار، وحمّل نموذجاً مدرَّباً."),
@@ -678,8 +767,6 @@ LANGS = {
         "home_no_torch": "🧠 نستخدم شبكة scikit-learn العصبية.",
         "home_signed_in": "مسجّل الدخول باسم {name}",
         "home_read_only": "قراءة فقط",
-
-        # ================================================== TUTORIAL
         "tut_hero_title": "الشرح",
         "tut_sub": "كل ما تحتاج معرفته عن التعلّم الآلي في صندوق.",
         "tut_pill_1": "موجّه", "tut_pill_2": "بكلمات بسيطة",
@@ -690,34 +777,42 @@ LANGS = {
         "tut_go_profile": "🔎  اذهب إلى محلّل البيانات →",
         "tut_go_knowledge": "📖  افتح شجرة المعرفة",
         "tut_warning": "⚠️ راجع هذا قبل استخدام الوكيل المُنشأ.",
-
-        # ================================================== ABOUT
-        "about_hero_title": "حول",
-        "about_hero_sub": "ما هو هذا المشروع، وما ليس كذلك، ومن بناه.",
-        "about_pill_1": "مشروع طلابي", "about_pill_2": "مسار وكيلي",
-        "about_pill_3": "مهندسان",
-        "about_what_title": "🎯 ما هو",
-        "about_what_body": ("التعلّم الآلي في صندوق مشروع طلابي. يلفّ نموذجاً "
-                             "لغوياً حول مسار تعلّم آلي قياسي ويسأل: كيف سيبدو "
-                             "الأمر لو جاءت القرارات من نموذج لغوي، بينما بقي "
-                             "التنفيذ في كود يمكنك قراءته؟"),
-        "about_not_title": "🛑 ما ليس كذلك",
-        "about_not_body": "ليس نظام إنتاج. ليس بديلاً عن عالِم بيانات.",
-        "about_stack_title": "🧱 الحزمة التقنية",
-        "about_stack_body": ("LangGraph، scikit-learn، PyTorch، Streamlit، "
-                              "ونموذج لغوي متوافق مع OpenAI."),
-        "about_decides_title": "🧠 كيف يقرّر",
-        "about_decides_body": ("أربعة قرارات من النموذج اللغوي: عمود الهدف، "
-                                "وميزات التفاعل، ومجموعة النماذج، وإجراء "
-                                "الإصلاح بعد التدريب."),
-        "about_team_title": "الفريق",
+        "about_hero_title": "قصتنا",
+        "about_hero_sub": "كيف بدأ مشروع التعلّم الآلي في صندوق، ولماذا بنيناه.",
+        "about_pill_1": "مشروع طلابي", "about_pill_2": "سهر",
+        "about_pill_3": "برمجة بلا نوم",
+        "about_what_title": "💡 لماذا بنينا هذا",
+        "about_what_body": (
+            "لاحظنا أن تدريب نموذج تعلّم آلي غالباً ما يكون صندوقاً أسود. "
+            "تشغّل كوداً، تظهر أرقام، وتأمل الأفضل. أردنا بناء أداة تشرح "
+            "*سبب* اتخاذ القرارات. وُلد هذا المشروع من الرغبة في جعل الذكاء الاصطناعي "
+            "سهل الوصول، شفاف، وممتع للاستخدام."
+        ),
+        "about_not_title": "🛑 مواجهة الواقع",
+        "about_not_body": (
+            "هذا ليس منتجاً تجارياً بملايين الدولارات. إنه مشروع شغف بناه "
+            "طالبا هندسة. فيه أخطاء، وفيه غرابة، لكنه يمثل مئات الساعات "
+            "من التعلّم والتصحيح. إنه دليل على ما يمكنك بناؤه عندما ترفض التخلي عن فكرة جيدة."
+        ),
+        "about_stack_title": "🧱 التقنيات",
+        "about_stack_body": (
+            "استخدمنا LangGraph لتنظيم سير عمل الوكيل (الدماغ). "
+            "تحت الغطاء، تقوم scikit-learn و PyTorch بالعمل الشاق للنماذج. "
+            "توفر Streamlit الواجهة. أخيراً، يعمل نموذج لغوي كبير كمحرك استدلال."
+        ),
+        "about_decides_title": "🧠 الإنسان في الحلقة",
+        "about_decides_body": (
+            "لم نرد ذكاءً اصطناعياً يعمل بلا رقابة. بنينا نقاط تفتيش. "
+            "يقترح الذكاء الاصطناعي خطة تنظيف، لكنه يتوقف ويطلب موافقتك قبل "
+            "لمس بياناتك. إذا كان النموذج ضعيفاً، يقترح الذكاء الاصطناعي حلاً — "
+            "لكن الكلمة الأخيرة دائماً لك."
+        ),
+        "about_team_title": "قابل المهندسين",
         "about_role_anas": "لاعب، مترجم غير راغب، وأكل كثير محترف",
         "about_role_muad": "مشاهد أنمي محترف، استراتيجي بارع.",
-        "about_btn_tutorial": "📚  الشرح",
-        "about_btn_knowledge": "📖  شجرة المعرفة",
-        "about_btn_start": "🔎  ابدأ بمجموعة بيانات",
-
-        # ================================================== CHAT
+        "about_btn_tutorial": "📚  اقرأ الشرح",
+        "about_btn_knowledge": "📖  استكشف شجرة المعرفة",
+        "about_btn_start": "🔎  ابدأ مشروعك الأول",
         "chat_hero_title": "اسأل",
         "chat_hero_sub": "اكتب أيّ شيء. يجيب المساعد من الجلسة الحالية.",
         "chat_pill_1": "بدون نقر", "chat_pill_2": "يستخدم بيانات حقيقية",
@@ -744,8 +839,6 @@ LANGS = {
             "ما هو التحقق المتقاطع؟",
             "هل وجد الفحص الذاتي شيئاً؟",
         ],
-
-        # ================================================== LOGIN
         "login_brand": "🤖 التعلّم الآلي في صندوق",
         "login_sub": "سجّل الدخول للمتابعة.",
         "login_username": "اسم المستخدم", "login_password": "كلمة المرور",
@@ -753,8 +846,6 @@ LANGS = {
         "login_wrong": "اسم المستخدم أو كلمة المرور خاطئة.",
         "login_success": "تم تسجيل الدخول.",
         "login_demo_title": "حسابات تجريبية",
-
-        # ================================================== PROFILE
         "prof_hero_title": "محلّل البيانات",
         "prof_hero_sub": ("ارفع مجموعة بيانات للاستكشاف، أو ارفع حزمة نموذج "
                            "(.zip) لاستخدام نموذج مدرَّب مباشرة."),
@@ -784,6 +875,7 @@ LANGS = {
         "prof_reupload_btn": "↺  ارفع ملفاً آخر",
         "prof_upload_model_tab": "📦  ارفع نموذجاً",
         "prof_upload_dataset_tab": "📊  ارفع مجموعة بيانات",
+        "prof_upload_cv_tab": "👁️  الرؤية الحاسوبية",
         "prof_model_intro_title": "📦 ارفع نموذجاً محفوظاً",
         "prof_model_intro_body": "ارفع حزمة .zip من صفحة النتائج.",
         "prof_model_drop_label": "📦 أفلت حزمة .zip هنا",
@@ -812,8 +904,6 @@ LANGS = {
         "prof_chat_placeholder": "مثلاً: أيّ أعمدة فيها قيم مفقودة؟",
         "prof_chat_send": "إرسال", "prof_chat_clear": "مسح المحادثة",
         "prof_you": "أنت", "prof_assistant": "المساعد",
-
-        # ================================================== SETUP
         "setup_nlp_step1": "### الخطوة 1 — إعداد NLP",
         "setup_ml_step1": "### الخطوة 1 — نمط التعلّم",
         "setup_lm_pick": "أيّ عائلة من النماذج يستخدم هذا التشغيل؟",
@@ -878,8 +968,6 @@ LANGS = {
         "setup_manual_label": "النماذج للتدريب",
         "setup_pick_hint": "اختر هدفاً وعمود مُدخل.",
         "setup_continue_btn": "متابعة → اقتراح خطة تنظيف",
-
-        # ================================================== PLAN
         "plan_title": "### خطة التنظيف",
         "plan_caption": "هذا ما يريد الوكيل فعله بالبيانات قبل التدريب.",
         "plan_spinner": "نطلب من النموذج اللغوي صياغة خطة…",
@@ -898,8 +986,6 @@ LANGS = {
         "plan_info": "يُفحص اقتراح الوكيل مقابل البيانات الحقيقية.",
         "plan_approve": "✓ موافق وابدأ التدريب",
         "plan_reject": "✗ ارفض واختر مُدخلات جديدة",
-
-        # ================================================== TRAIN
         "train_title": "### التدريب",
         "train_spinner": "ندرّب النماذج…",
         "train_starting": "نبدأ…", "train_fitting": "ندرّب النماذج…",
@@ -908,8 +994,8 @@ LANGS = {
         "train_stopped": "توقّف التدريب: {err}",
         "train_back": "← رجوع",
         "train_retry_spinner": "إعادة المحاولة بأهم {n} ميزات: {feats}",
-
-        # ================================================== RESULTS
+        "train_game_title": "🎮 بينما تنتظر، العب إكس-أو!",
+        "train_game_caption": "الوكيل يدرّب نماذجك في الخلفية. حاول التغلب على الذكاء الاصطناعي.",
         "results_title": "### النتائج",
         "results_best_model": "أفضل نموذج",
         "results_cv": "نتيجة التحقق المتقاطع", "results_test": "نتيجة الاختبار",
@@ -964,8 +1050,6 @@ LANGS = {
         "results_try_another": "← جرّب هدفاً آخر",
         "results_metric_help": "**R² = {r2:.3f}** يفسّر حوالي {pct:.0f}% من تغيّر الهدف.",
         "results_metric_help_clf": "**F1 = {f1:.3f}** يوازن بين الضبط والاسترجاع.",
-
-        # ================================================== XAI
         "xai_global_title": "🧠 التفسير — ما الذي يحرّك هذا النموذج؟",
         "xai_global_body": "هذه الميزات الأكثر تأثيراً على التنبؤات، مقاسة بـ SHAP.",
         "xai_global_caption": "قيم SHAP تخبرك بكم تحرّك كل ميزة التنبؤ بالمتوسط.",
@@ -975,8 +1059,6 @@ LANGS = {
         "xai_row_no_shap": "ثبّت `pip install shap` لشرح كل صفّ.",
         "xai_row_unsupported": "هذا النموذج لا يدعم SHAP.",
         "xai_row_compute_error": "تعذّر حساب SHAP: {err}",
-
-        # ================================================== PREDICT
         "predict_manual_title": "**املأ المُدخلات** — أعمدة التفاعل تُحسب تلقائياً.",
         "predict_btn": "🔮  توقّع",
         "predict_result": "التنبؤ",
@@ -988,8 +1070,6 @@ LANGS = {
         "predict_download": "📥  حمّل التنبؤات (CSV)",
         "predict_missing_feature": "عمود ميزة مطلوب مفقود: {e}",
         "predict_failed": "فشل التنبؤ: {err}",
-
-        # ================================================== TUNING
         "tune_hero_title": "الضبط",
         "tune_hero_sub": "خُذ تشغيلاً سابقاً، غيّر شيئاً، وراقب النتيجة.",
         "tune_pill_1": "واعٍ بالسجل", "tune_pill_2": "مقارنة", "tune_pill_3": "سجل",
@@ -1022,8 +1102,6 @@ LANGS = {
         "tune_retrain_fail": "فشل إعادة التدريب: {err}",
         "tune_agent_adjusted": "⚠️ تم تعديل اقتراحات الوكيل لتكون في النطاق الصحيح.",
         "tune_no_params": "لا توجد معاملات قابلة للضبط لهذا النموذج.",
-
-        # ================================================== PLOT LABELS
         "plot_fpr": "معدّل الإيجابيات الكاذبة",
         "plot_tpr": "معدّل الإيجابيات الحقيقية",
         "plot_recall": "الاسترجاع", "plot_precision": "الضبط",
@@ -1031,8 +1109,6 @@ LANGS = {
         "plot_residual": "البواقي",
         "plot_roc_title": "ROC لكل فئة",
         "plot_pr_title": "Precision-Recall لكل فئة",
-
-        # ================================================== DOC TOOLS
         "doc_tools_hero_title": "أدوات المستندات",
         "doc_tools_hero_sub": "ارفع مستنداً، نظّفه، لخّصه، واسأل مع استشهادات.",
         "doc_tools_pill_rag": "RAG",
@@ -1101,8 +1177,6 @@ LANGS = {
         "doc_export_download_csv": "حمّل .csv",
         "doc_export_download_sql": "حمّل .sql",
         "doc_export_download_txt": "حمّل حزمة .txt",
-
-        # ================================================== AGENT BUILDER
         "agent_hero_title": "منشئ الوكيل",
         "agent_hero_sub": "صمّم وكيل ذكاء اصطناعي في بضعة أسئلة.",
         "agent_pill_guided": "موجّه",
@@ -1147,8 +1221,6 @@ LANGS = {
         "agent_download_py": "🐍 حمّل .py",
         "agent_download_pdf_unavail": "📕 PDF غير متاح",
         "agent_warning": "⚠️ راجع الكود قبل النشر.",
-
-        # ================================================== BYTE
         "byte_tooltip": "مرحباً، أنا بايت!",
         "byte_dialog_title": "🤖 بايت — مساعدك",
         "byte_dialog_caption": "اسألني أي شيء.",
@@ -1161,8 +1233,6 @@ LANGS = {
         "byte_tour_intro": "أنا دليلك الصغير.",
         "byte_tour_done": "فهمت — لنبدأ!",
         "byte_tour_footer": "انقرني في أي وقت.",
-
-        # ================================================== KNOWLEDGE
         "knowledge_hero_title": "شجرة المعرفة",
         "knowledge_hero_sub": "استكشف كل مفهوم — انقر للتعمّق.",
         "knowledge_pill_interactive": "تفاعلي",
@@ -1180,8 +1250,6 @@ LANGS = {
         "knowledge_youtube": "يوتيوب",
         "knowledge_docs": "التوثيق",
         "knowledge_not_found": "لم يُوجد المفهوم.",
-
-        # ================================================== NN PANEL
         "nn_framework_label": "الإطار",
         "nn_sklearn": "sklearn (CPU)",
         "nn_pytorch": "pytorch (يدعم GPU)",
@@ -1200,8 +1268,85 @@ LANGS = {
         "nn_cpu_warning": "🟡 لا يوجد GPU.",
         "nn_no_torch": "⚪ PyTorch غير مثبّت.",
         "nn_layers_error": "يجب أن تكون الطبقات أرقاماً مفصولة بفواصل.",
-
-        # ================================================== MISC
+        "cv_hero_title": "الرؤية الحاسوبية",
+        "cv_hero_sub": "ارفع مجموعة صور، درّب مصنّفاً، أو جرّب كشف الأجسام.",
+        "cv_pill_1": "تصنيف الصور", "cv_pill_2": "كشف YOLOv8",
+        "cv_pill_3": "تعلّم عميق", "cv_pill_4": "كاميرا مباشرة",
+        "cv_tab_class": "التصنيف",
+        "cv_tab_detect": "الكشف (YOLOv8)",
+        "cv_tab_seg": "التجزئة",
+        "cv_sec_1": "### 1. ارفع مجموعة البيانات",
+        "cv_zip_title": "مجموعة صور (.zip)",
+        "cv_zip_body": "ارفع ملف ZIP حيث كل مجلد يمثل فئة. مثلاً cats/, dogs/.",
+        "cv_zip_min": "2 صور على الأقل لكل فئة.",
+        "cv_zip_upload": "أفلت ملف .zip هنا",
+        "cv_zip_extract": "نستخرج ونقرأ الفئات...",
+        "cv_zip_fail": "لم نجد مجلدين على الأقل داخل الملف.",
+        "cv_stat_classes": "الفئات",
+        "cv_stat_train": "صور التدريب",
+        "cv_stat_val": "صور التحقق",
+        "cv_classes_prefix": "الفئات: ",
+        "cv_diff_dataset": "ارفع مجموعة مختلفة",
+        "cv_sec_2": "### 2. اختر البنية",
+        "cv_suggested_backbone": "مقترح: **{name}**. {reason}",
+        "cv_backbone": "الهيكل الأساسي",
+        "cv_custom_caption": "ابنِ شبكة CNN من الصفر.",
+        "cv_sec_3": "### 3. إعدادات التدريب",
+        "cv_epochs": "الحقب",
+        "cv_lr": "معدّل التعلّم",
+        "cv_bs": "حجم الدفعة",
+        "cv_freeze": "تجميد الهيكل الأساسي",
+        "cv_freeze_help": "درّب المصنّف النهائي فقط. يسرّع التدريب.",
+        "cv_sec_4": "### 4. ابدأ التدريب",
+        "cv_start_btn": "🚀 درّب النموذج",
+        "cv_training": "جاري التدريب...",
+        "cv_progress_epoch": "الحقبة {e}/{n}",
+        "cv_progress_line": "الحقبة {e}: خسارة التدريب = {tl:.3f}, خسارة التحقق = {vl:.3f}, دقة التحقق = {va:.2%}",
+        "cv_evaluating": "نقيّم...",
+        "cv_sec_5": "### 5. النتائج",
+        "cv_val_acc": "دقة التحقق",
+        "cv_architecture": "البنية",
+        "cv_confusion": "مصفوفة الالتباس",
+        "cv_per_class": "مقاييس كل فئة",
+        "cv_sample_preds": "عيّنة من التنبؤات",
+        "cv_predict_title": "### 🔮 جرّب النموذج",
+        "cv_predict_using": "باستخدام: {m}",
+        "cv_predict_loaded": " (محمل من القرص)",
+        "cv_predict_fail": "فشل التنبؤ: {err}",
+        "cv_predict_label": "التنبؤ",
+        "cv_predict_conf": "الثقة: {c:.1f}%",
+        "cv_saved_title": "### 💾 النماذج المحفوظة",
+        "cv_saved_caption": "يمكنك حفظ حتى {n} نماذج.",
+        "cv_saved_already": "النموذج محفوظ مسبقاً.",
+        "cv_saved_full": "الذاكرة ممتلئة ({n}/{n}). احذف نموذجاً للحفظ.",
+        "cv_saved_name_label": "اسم النموذج",
+        "cv_saved_name_placeholder": "مثلاً: قطط وكلاب v1",
+        "cv_saved_save_btn": "احفظ النموذج ({cur}/{max})",
+        "cv_saved_confirm_flash": "تم الحفظ بنجاح.",
+        "cv_saved_train_first": "درّب نموذجاً أولاً لحفظه.",
+        "cv_saved_in_use": "قيد الاستخدام",
+        "cv_saved_val_acc": "الدقة: {p:.1f}%",
+        "cv_saved_saved_at": "حُفظ: {when}",
+        "cv_saved_size": "الحجم: {mb} MB",
+        "cv_saved_load": "تحميل",
+        "cv_saved_loading": "نحمّل النموذج...",
+        "cv_saved_load_flash": "تم تحميل {m}.",
+        "cv_saved_delete": "حذف",
+        "cv_saved_confirm": "تأكيد",
+        "cv_saved_confirm_warn": "⚠️ هل أنت متأكد؟ لا يمكن التراجع.",
+        "cv_saved_cancel": "إلغاء",
+        "cv_detect_wip_title": "🚧 كشف بدون تدريب",
+        "cv_detect_wip_body": "استخدم YOLOv8 للكشف عن الأجسام بدون تدريب.",
+        "cv_detect_wip_body2": "ارفع صورة في الصندوق أعلاه.",
+        "cv_detect_wip_foot": "مدعوم بـ ultralytics.",
+        "cv_detect_arch_title": "النماذج المتاحة",
+        "cv_detect_locked": "الكشف جاهز للاستخدام.",
+        "cv_seg_wip_title": "🚧 التجزئة",
+        "cv_seg_wip_body": "تصنيف كل بكسل. قريباً.",
+        "cv_seg_wip_body2": "نعمل على دمج SAM و U-Net.",
+        "cv_seg_wip_foot": "ترقّبونا.",
+        "cv_seg_arch_title": "البنى المخطط لها",
+        "cv_seg_locked": "التجزئة مقفلة في هذا الإصدار.",
         "theme_dark": "داكن",
         "theme_light": "فاتح",
     },

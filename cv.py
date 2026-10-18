@@ -3,7 +3,8 @@ Computer Vision engine.
 
 Provides:
   - torch_status()
-  - CLASSIFICATION_BACKBONES / DETECTION_BACKBONES / SEGMENTATION_BACKBONES
+  - CLASSIFICATION_BACKBONES / DETECTION_BACKBONES / SEGMENTATION_BACKBONES /
+    YOLO_BACKBONES
   - default_layer_spec()
   - extract_zip_to_folder()
   - build_dataloaders()
@@ -13,9 +14,10 @@ Provides:
   - Persistent save slots:
       list_saved_models() / save_model_slot() /
       load_model_slot() / delete_model_slot()
-
-Detection and segmentation are catalog-only (no training loop) — that
-matches the page's stated scope.
+  - Zero-shot predictors:
+      predict_detection() / predict_segmentation() / predict_yolov8()
+  - YOLOv8 fine-tuning:
+      prepare_yolo_dataset() / train_yolov8()
 """
 import io
 import os
@@ -122,6 +124,16 @@ SEGMENTATION_BACKBONES = {
                   "blurb": "Promptable Segment-Anything. Zero-shot, needs prompts."},
 }
 
+# YOLOv8 model sizes. `weights` is the file ultralytics will download on first
+# use; it doubles as the starting point when fine-tuning.
+YOLO_BACKBONES = {
+    "yolov8n": {"name": "YOLOv8 Nano",     "params": "3.2M",  "speed": "Fastest",  "weights": "yolov8n.pt"},
+    "yolov8s": {"name": "YOLOv8 Small",    "params": "11.2M", "speed": "Fast",     "weights": "yolov8s.pt"},
+    "yolov8m": {"name": "YOLOv8 Medium",   "params": "25.9M", "speed": "Balanced", "weights": "yolov8m.pt"},
+    "yolov8l": {"name": "YOLOv8 Large",    "params": "43.7M", "speed": "Accurate", "weights": "yolov8l.pt"},
+    "yolov8x": {"name": "YOLOv8 X-Large",  "params": "68.2M", "speed": "Best",     "weights": "yolov8x.pt"},
+}
+
 
 def default_layer_spec():
     """Reasonable starter stack for the custom CNN builder."""
@@ -158,7 +170,9 @@ class _ImageFolderDataset(Dataset):
 
     def __getitem__(self, i):
         path, label = self.samples[i]
-        img = Image.open(path).convert("RGB")
+        # `with` so the handle is released on Windows before rmtree runs.
+        with Image.open(path) as im:
+            img = im.convert("RGB")
         if self.transform:
             img = self.transform(img)
         return img, label
@@ -172,7 +186,7 @@ def extract_zip_to_folder(zip_bytes, dest):
         z.extractall(dest)
 
     cur = dest
-    for _ in range(6):  # descend a few levels if the zip is nested
+    for _ in range(6):
         children = [c for c in os.listdir(cur)
                     if os.path.isdir(os.path.join(cur, c))
                     and not c.startswith("__")]
@@ -262,12 +276,7 @@ def build_dataloaders(root, batch_size=16, input_size=224, val_split=0.2):
 
 # ============================================================ 4. MODELS
 def _build_custom_cnn(layers, n_classes):
-    """Build a small CNN from the layer spec.
-
-    Conv / pool / batchnorm / dropout run on the spatial tensor.
-    The first `dense` inserts a global average pool + flatten so we do not
-    blow up parameter counts from a huge flatten. Final head -> n_classes.
-    """
+    """Build a small CNN from the layer spec."""
     modules = []
     c_in = 3
     in_dense = False
@@ -323,7 +332,6 @@ def build_classifier(backbone_key, n_classes, freeze_backbone=True,
     info = CLASSIFICATION_BACKBONES[backbone_key]
     model = info["ctor"]()
 
-    # Swap the classifier head for our class count.
     if hasattr(model, "fc") and isinstance(model.fc, nn.Linear):
         model.fc = nn.Linear(model.fc.in_features, n_classes)
     elif hasattr(model, "classifier"):
@@ -371,8 +379,7 @@ def _class_weights(loader, n_classes, device):
 
 def train_classifier(model, tr_loader, va_loader, device,
                      epochs=5, lr=1e-3, progress_cb=None, patience=4):
-    """Train and return a history dict:
-       {"train_loss": [...], "val_loss": [...], "val_acc": [...]}"""
+    """Train and return a history dict."""
     model.to(device)
     params = [p for p in model.parameters() if p.requires_grad]
     if not params:
@@ -457,10 +464,7 @@ def _evaluate_loss_acc(model, loader, device, loss_fn):
 
 @torch.no_grad()
 def evaluate(model, loader, device, class_names):
-    """Return (accuracy, confusion_df, per_class_df, samples).
-
-    samples: list of (cpu_tensor_image, true_idx, pred_idx, confidence)
-    """
+    """Return (accuracy, confusion_df, per_class_df, samples)."""
     model.eval()
     all_true, all_pred = [], []
     samples = []
@@ -559,11 +563,7 @@ def _slug(text):
 
 
 def list_saved_models(owner=None):
-    """Return metadata for every saved slot on disk, newest first.
-
-    If `owner` is provided, only slots saved by that user are returned.
-    Pass owner="" to mean "the anonymous user".
-    """
+    """Return metadata for every saved slot on disk, newest first."""
     if not os.path.isdir(CV_SAVE_DIR):
         return []
     slots = []
@@ -582,19 +582,13 @@ def list_saved_models(owner=None):
         meta["id"] = slot_id
         meta["_weights_file"] = os.path.join(CV_SAVE_DIR, f"{slot_id}.pt")
         slots.append(meta)
-    # newest first — sort by saved_at if present, else by id
     slots.sort(key=lambda m: m.get("saved_at", m.get("id", "")), reverse=True)
     return slots
 
 
 def save_model_slot(model, label, backbone_key, custom_layers, class_names,
                     input_size, accuracy, n_classes, owner=""):
-    """Persist one trained model to disk. Returns its metadata dict.
-
-    `owner` is stored inside the metadata and (as a slug) inside the slot id,
-    so different users can save models with the same label at the same
-    second without collision.
-    """
+    """Persist one trained model to disk. Returns its metadata dict."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
     os.makedirs(CV_SAVE_DIR, exist_ok=True)
@@ -616,12 +610,10 @@ def save_model_slot(model, label, backbone_key, custom_layers, class_names,
         "saved_at": datetime.datetime.now().isoformat(timespec="seconds"),
     }
 
-    # Always save CPU state so files are portable between machines.
     cpu_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
     weights_path = os.path.join(CV_SAVE_DIR, f"{slot_id}.pt")
     torch.save(cpu_state, weights_path)
 
-    # Record file size for the UI.
     try:
         meta["size_mb"] = round(os.path.getsize(weights_path) / (1024 * 1024), 1)
     except Exception:
@@ -635,10 +627,7 @@ def save_model_slot(model, label, backbone_key, custom_layers, class_names,
 
 
 def load_model_slot(slot_id):
-    """Rebuild a saved model on the current device.
-
-    Returns (model, meta). The model is in eval() mode.
-    """
+    """Rebuild a saved model on the current device. Returns (model, meta)."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
 
@@ -709,7 +698,7 @@ def predict_detection(pil_image, score_thresh=0.5):
                      "x2": round(xyxy[2], 1), "y2": round(xyxy[3], 1)})
         draw_boxes.append((xyxy, lab, float(score)))
     annotated = img.copy()
-    from PIL import ImageDraw, ImageFont
+    from PIL import ImageDraw
     draw = ImageDraw.Draw(annotated)
     for xyxy, lab, score in draw_boxes:
         draw.rectangle(xyxy, outline="#22d3ee", width=3)
@@ -750,3 +739,216 @@ def predict_segmentation(pil_image):
     overlay = Image.fromarray(palette).resize(img.size, Image.NEAREST)
     blended = Image.blend(img, overlay.convert("RGB"), 0.45)
     return blended, legend
+
+
+def predict_yolov8(pil_image, weights_path=None, conf=0.25):
+    """YOLOv8 inference.
+
+    weights_path: optional path to a trained .pt file. If None, uses the
+    pre-trained COCO nano model (`yolov8n.pt`) for zero-shot detection.
+    Returns (annotated PIL, pd.DataFrame of boxes).
+    """
+    if not TORCH:
+        raise RuntimeError("PyTorch is not installed. YOLOv8 requires it.")
+    try:
+        from ultralytics import YOLO
+    except ImportError:
+        raise ImportError(
+            "The `ultralytics` package is not installed. "
+            "Run `pip install ultralytics`.")
+
+    model = YOLO(weights_path or "yolov8n.pt")
+    results = model(pil_image, conf=conf, verbose=False)
+
+    res = results[0]
+    im_array = res.plot()
+    annotated_img = Image.fromarray(im_array[..., ::-1])
+
+    rows = []
+    if res.boxes is not None:
+        for box in res.boxes:
+            cls_id = int(box.cls[0])
+            conf_v = float(box.conf[0])
+            label = res.names.get(cls_id, str(cls_id))
+            coords = box.xyxy[0].cpu().numpy()
+            rows.append({
+                "Object": label,
+                "Confidence": f"{conf_v:.2%}",
+                "X1": round(float(coords[0]), 1),
+                "Y1": round(float(coords[1]), 1),
+                "X2": round(float(coords[2]), 1),
+                "Y2": round(float(coords[3]), 1),
+            })
+
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.sort_values("Confidence", ascending=False)
+    return annotated_img, df
+
+
+# ============================================================ 9. YOLOV8 FINE-TUNING
+def _walk_dirs(root, max_depth=4):
+    """Yield directories up to max_depth below root (inclusive)."""
+    root = os.path.abspath(root)
+    for dirpath, dirnames, _ in os.walk(root):
+        rel = os.path.relpath(dirpath, root)
+        depth = 0 if rel == "." else rel.count(os.sep) + 1
+        if depth > max_depth:
+            dirnames[:] = []
+            continue
+        yield dirpath
+
+
+def _find_yolo_root(root):
+    """Find the first dir that looks like a YOLO dataset root."""
+    for d in _walk_dirs(root):
+        if (os.path.isdir(os.path.join(d, "images", "train"))
+                and os.path.isdir(os.path.join(d, "labels", "train"))):
+            return d
+        # Allow the un-split layout: images/ + labels/ side by side
+        if (os.path.isdir(os.path.join(d, "images"))
+                and os.path.isdir(os.path.join(d, "labels"))):
+            return d
+    return None
+
+
+def _infer_class_names(labels_dir):
+    """Scan .txt labels and collect class IDs → {id: 'class_id'}."""
+    classes = set()
+    if os.path.isdir(labels_dir):
+        for fn in os.listdir(labels_dir):
+            if not fn.lower().endswith(".txt"):
+                continue
+            try:
+                with open(os.path.join(labels_dir, fn),
+                          "r", encoding="utf-8") as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if parts:
+                            try:
+                                classes.add(int(float(parts[0])))
+                            except ValueError:
+                                pass
+            except Exception:
+                continue
+    if not classes:
+        classes = {0}
+    return {i: f"class_{i}" for i in sorted(classes)}
+
+
+def prepare_yolo_dataset(zip_bytes, dest):
+    """Extract a YOLO-format dataset zip and write `data.yaml`.
+
+    Returns (yaml_path, names_dict). Raises ValueError if the zip does not
+    contain `images/train/` + `labels/train/` (or `images/` + `labels/`).
+    """
+    os.makedirs(dest, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        z.extractall(dest)
+
+    root = _find_yolo_root(dest)
+    if root is None:
+        raise ValueError(
+            "Could not find a YOLO dataset inside the zip. Expected "
+            "`images/train/` + `labels/train/` (or `images/` + `labels/`). "
+            "See https://docs.ultralytics.com/datasets/detect/ for the format.")
+
+    has_val = os.path.isdir(os.path.join(root, "images", "val"))
+    val_rel = "images/val" if has_val else "images/train"
+
+    names = _infer_class_names(os.path.join(root, "labels", "train"))
+
+    data = {
+        "path": os.path.abspath(root),
+        "train": "images/train",
+        "val": val_rel,
+        "names": names,
+    }
+
+    yaml_path = os.path.join(root, "data.yaml")
+    try:
+        import yaml
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+    except ImportError:
+        # Fallback: hand-write a minimal valid YAML.
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            f.write(f"path: {data['path']}\n")
+            f.write(f"train: {data['train']}\n")
+            f.write(f"val: {data['val']}\n")
+            f.write("names:\n")
+            for k, v in names.items():
+                f.write(f"  {k}: {v}\n")
+
+    return yaml_path, names
+
+
+def train_yolov8(data_yaml, base_model="yolov8n.pt", epochs=50,
+                 imgsz=640, batch=16, project_dir="outputs",
+                 run_name=None, workers=0, progress_cb=None):
+    """Fine-tune a YOLOv8 model on a YOLO-format dataset.
+
+    Returns (best_weights_path, results_or_None).
+
+    `progress_cb` is called with kwargs `epoch`, `epochs`, `metrics`
+    after every training epoch.
+    """
+    if not TORCH:
+        raise RuntimeError("PyTorch is not installed. YOLOv8 requires it.")
+    try:
+        from ultralytics import YOLO
+    except ImportError:
+        raise ImportError(
+            "The `ultralytics` package is not installed. "
+            "Run `pip install ultralytics`.")
+
+    if not os.path.isfile(data_yaml):
+        raise FileNotFoundError(f"data.yaml not found: {data_yaml}")
+
+    if run_name is None:
+        run_name = f"yolo_{datetime.datetime.now():%Y%m%d_%H%M%S}"
+
+    model = YOLO(base_model)
+
+    def _on_epoch_end(trainer):
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(
+                epoch=int(getattr(trainer, "epoch", 0)) + 1,
+                epochs=int(getattr(trainer, "epochs", epochs)),
+                metrics=getattr(trainer, "metrics", None),
+            )
+        except Exception:
+            pass
+
+    try:
+        model.add_callback("on_train_epoch_end", _on_epoch_end)
+    except Exception:
+        pass
+
+    os.makedirs(project_dir, exist_ok=True)
+
+    model.train(
+        data=data_yaml,
+        epochs=epochs,
+        imgsz=imgsz,
+        batch=batch,
+        project=project_dir,
+        name=run_name,
+        exist_ok=True,
+        verbose=False,
+        plots=True,
+        workers=workers,
+    )
+
+    best = os.path.join(project_dir, run_name, "weights", "best.pt")
+    if not os.path.isfile(best):
+        last = os.path.join(project_dir, run_name, "weights", "last.pt")
+        if os.path.isfile(last):
+            best = last
+    if not os.path.isfile(best):
+        raise FileNotFoundError(
+            f"Training finished but no weights found at "
+            f"{project_dir}/{run_name}/weights/.")
+    return best, None

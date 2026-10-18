@@ -3,7 +3,7 @@ NLP engine — text classification, document tools, topic search.
 
 Sections:
   1. Text classification pipeline (TF-IDF + linear classifiers)
-  2. Document cleaning + tokenization (proper)
+  2. Document cleaning + tokenization (Unicode-aware)
   3. Summarization, translation, grammar
   4. Topic clustering and similarity search
 """
@@ -223,8 +223,13 @@ URL_RE = re.compile(r"https?://\S+|www\.\S+")
 EMAIL_RE = re.compile(r"\S+@\S+\.\S+")
 WS_RE = re.compile(r"\s+")
 CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
-PUNCT_RE = re.compile(r"[^\w\s]")
+PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
 DIGIT_RE = re.compile(r"\d+")
+# Unicode-aware word tokenization: matches any letter sequence (Latin, Arabic,
+# Cyrillic, Hindi, Chinese, ...) optionally followed by an apostrophe-word, or
+# a bare number. Also handles Arabic Tatweel and diacritics implicitly, since
+# Python's `re.UNICODE` treats them as combining characters.
+WORD_TOKEN_RE = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)?|\d+", re.UNICODE)
 
 STOP_WORDS = {
     "a", "an", "the", "and", "or", "but", "if", "then", "so", "of", "to", "in",
@@ -298,13 +303,16 @@ def clean_text(text,
 
 
 def tokenize(text, keep_stopwords=True, keep_punctuation=False):
-    """Split text into tokens. Returns a list of strings."""
+    """Split text into tokens. Returns a list of strings.
+
+    Unicode-aware: works on Arabic, Cyrillic, Greek, Devanagari, etc. —
+    not just Latin. Numbers are kept as-is; punctuation is dropped unless
+    explicitly requested.
+    """
     if text is None:
         return []
     t = str(text)
-    # Keep apostrophes inside words (e.g. don't)
-    tokens = re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?|\d+", t)
-    tokens = [tok.lower() for tok in tokens]
+    tokens = [m.group(0).lower() for m in WORD_TOKEN_RE.finditer(t)]
     if not keep_stopwords:
         tokens = [tok for tok in tokens if tok not in STOP_WORDS]
     return tokens

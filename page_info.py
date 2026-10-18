@@ -5,6 +5,8 @@ import io
 import os
 import json
 import datetime
+import re
+import html
 import urllib.parse
 import uuid
 
@@ -232,20 +234,45 @@ def render_tutorial():
 
 
 # ============================================================
-# ABOUT
+# ABOUT (NARRATIVE STORY)
 # ============================================================
 def render_about():
     ui.hero(t("about_hero_title"), t("about_hero_sub"),
             pills=[t("about_pill_1"), t("about_pill_2"), t("about_pill_3")])
 
-    for title_key, body_key in [
-        ("about_what_title", "about_what_body"),
-        ("about_not_title", "about_not_body"),
-        ("about_stack_title", "about_stack_body"),
-        ("about_decides_title", "about_decides_body"),
-    ]:
-        _html(f'<div class="card"><h4>{t(title_key)}</h4>'
-              f'<p>{t(body_key)}</p></div>')
+    _html(
+        f'<div class="card" style="border-left: 4px solid #D4AF37;">'
+        f'<h4>{t("about_what_title")}</h4>'
+        f'<p style="font-size: 1.05rem; line-height: 1.7;">{t("about_what_body")}</p>'
+        f'</div>'
+    )
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        _html(
+            f'<div class="card" style="height: 100%;">'
+            f'<h4>{t("about_not_title")}</h4>'
+            f'<p>{t("about_not_body")}</p>'
+            f'</div>'
+        )
+    with c2:
+        _html(
+            f'<div class="card" style="height: 100%;">'
+            f'<h4>{t("about_decides_title")}</h4>'
+            f'<p>{t("about_decides_body")}</p>'
+            f'</div>'
+        )
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    _html(
+        f'<div class="card" style="border-left: 4px solid #00F0FF;">'
+        f'<h4>{t("about_stack_title")}</h4>'
+        f'<p style="font-size: 1.05rem; line-height: 1.7;">{t("about_stack_body")}</p>'
+        f'</div>'
+    )
 
     st.divider()
     st.markdown(f"### {t('about_team_title')}")
@@ -264,7 +291,7 @@ def render_about():
                               f'padding:1rem 0;">{fallback}</div>')
                 _html(
                     f'<h4 style="text-align:center;">{name}</h4>'
-                    f'<p style="text-align:center;">{role}</p>'
+                    f'<p style="text-align:center; font-weight: 600; color: {ui._palette(st.session_state.get("theme", "light"))["accent"]};">{role}</p>'
                     f'<p style="font-size:0.9rem;text-align:center;">'
                     f'📱 <b>{phone}</b> (WhatsApp)</p>')
 
@@ -294,9 +321,6 @@ def render_about():
 # ============================================================
 # KNOWLEDGE TREE — bilingual, rich
 # ============================================================
-# Structure: {node_name: {"en": {desc, example}, "ar": {desc, example},
-#                         "related": [...], "children": {...}}}
-
 KNOWLEDGE_TREE = {
     "AI": {
         "en": {
@@ -747,12 +771,6 @@ def _docs_url(term):
 # ============================================================
 # TREE NAVIGATION
 # ============================================================
-def _node_name(node):
-    """The display name is always the top-level dict key; localized content
-    is inside 'en'/'ar'."""
-    return node
-
-
 def _get_node(tree, path):
     node = tree
     for part in path:
@@ -760,6 +778,8 @@ def _get_node(tree, path):
             return None
         if "children" in node and part in node["children"]:
             node = node["children"][part]
+        elif part in node:
+            node = node[part]
         else:
             return None
     return node
@@ -789,21 +809,22 @@ def render_knowledge():
                t("knowledge_pill_plain")])
 
     all_nodes = list(_flatten(KNOWLEDGE_TREE))
-    all_names = sorted(set(p[-1] for p, _ in all_nodes))
+    # Options are full paths (e.g. "AI > ML > Supervised Learning > Classification")
+    # so duplicate short names (there are two "Classification" nodes) are
+    # distinguishable.
+    path_options = [" › ".join(p) for p, _ in all_nodes]
 
     search = st.selectbox(
         t("knowledge_search"),
-        [t("knowledge_search_default")] + all_names,
+        [t("knowledge_search_default")] + path_options,
         key="know_search")
 
     if "know_path" not in st.session_state:
         st.session_state.know_path = ["AI"]
 
     if search and search != t("knowledge_search_default"):
-        for p, _ in all_nodes:
-            if p[-1] == search:
-                st.session_state.know_path = p
-                break
+        parts = search.split(" › ")
+        st.session_state.know_path = parts
 
     path = st.session_state.know_path
     current = _get_node(KNOWLEDGE_TREE, path)
@@ -826,12 +847,11 @@ def render_knowledge():
     example = _localized(current, "example", lang)
     related = current.get("related", [])
 
-    # Build the whole card as one HTML string and use st.html
     parts = []
     parts.append(
         f'<div style="background: {card_bg}; border: 2px solid {accent}; '
         f'border-radius: 20px; padding: 2rem; margin: 1rem 0;">')
-    parts.append(f'<h2 style="color: {accent}; margin: 0 0 0.6rem 0;">{term}</h2>')
+    parts.append(f'<h2 style="color: {accent}; margin: 0 0 0.6rem 0;">{html.escape(term)}</h2>')
     parts.append(
         f'<p style="font-size: 1rem; line-height: 1.7; color: {text_muted}; '
         f'margin: 0;">{desc}</p>')
@@ -846,14 +866,13 @@ def render_knowledge():
         pills = " ".join(
             f'<span style="background:{accent}22;color:{accent};'
             f'padding:3px 12px;border-radius:14px;font-weight:600;'
-            f'font-size:0.78rem;margin-right:6px;">{r}</span>'
+            f'font-size:0.78rem;margin-right:6px;">{html.escape(r)}</span>'
             for r in related)
         parts.append(
             f'<p style="font-size:0.85rem;color:{text_muted};'
             f'margin: 0.8rem 0 0 0;">'
             f'<b>{t("knowledge_related")}</b> {pills}</p>')
 
-    # Links row
     parts.append(
         f'<div style="margin-top:1.2rem;padding-top:1rem;'
         f'border-top:1px dashed {border};">'
@@ -879,13 +898,11 @@ def render_knowledge():
 
     _html("".join(parts))
 
-    # Up button
     if len(path) > 1:
         if st.button(t("knowledge_up"), key="know_up"):
             st.session_state.know_path = path[:-1]
             st.rerun()
 
-    # Children
     children = current.get("children") if isinstance(current, dict) else None
     if children:
         st.markdown(t("knowledge_explore_deeper"))
@@ -910,25 +927,6 @@ def render_knowledge():
                             st.rerun()
     else:
         st.caption(t("knowledge_leaf"))
-
-    # Browse-all mode
-    st.divider()
-    with st.expander("🗂️ " + t("knowledge_hero_title") + " — all concepts",
-                     expanded=False):
-        for p, node in all_nodes:
-            name = p[-1]
-            short = _localized(node, "desc", lang)
-            # truncate
-            if len(short) > 200:
-                short = short[:200] + "…"
-            _html(
-                f'<div style="padding:0.8rem 0;'
-                f'border-bottom:1px solid {border};">'
-                f'<b style="color:{accent};font-size:0.95rem;">'
-                f'{" › ".join(p)}</b>'
-                f'<p style="margin:0.3rem 0 0 0;font-size:0.85rem;'
-                f'color:{text_muted};line-height:1.5;">{short}</p>'
-                f'</div>')
 
 
 # ============================================================
@@ -1096,6 +1094,11 @@ def _agent_pdf_bytes(spec):
     return buf.getvalue()
 
 
+def _safe_slug(text):
+    """Lowercase and replace non-alphanumerics with underscores."""
+    return re.sub(r"[^a-z0-9_]+", "_", str(text).lower()).strip("_") or "agent"
+
+
 def render_agent_builder():
     ui.hero(t("agent_hero_title"), t("agent_hero_sub"),
             pills=[t("agent_pill_guided"), t("agent_pill_prompt"),
@@ -1147,16 +1150,17 @@ def render_agent_builder():
             "goal": goal, "goal_detail": goal_detail, "role": role,
             "tools": tools, "memory": memory, "hitl": hitl,
             "guardrails": guardrails}
+    slug = _safe_slug(spec["name"])
 
     st.divider()
     st.markdown(t("agent_result_ready"))
     _html(
         f'<div class="card"><h4>{t("agent_result_preview")}</h4>'
-        f'<p><b>{t("agent_result_name")}:</b> {spec["name"]} · '
-        f'<b>{t("agent_result_tone")}:</b> {spec["tone"]}</p>'
-        f'<p><b>{t("agent_result_goal")}:</b> {spec["goal"]}</p>'
+        f'<p><b>{t("agent_result_name")}:</b> {html.escape(spec["name"])} · '
+        f'<b>{t("agent_result_tone")}:</b> {html.escape(spec["tone"])}</p>'
+        f'<p><b>{t("agent_result_goal")}:</b> {html.escape(spec["goal"])}</p>'
         f'<p><b>{t("agent_result_tools")}:</b> '
-        f'{", ".join(tools) if tools else "none"}</p>'
+        f'{html.escape(", ".join(tools)) if tools else "none"}</p>'
         f'<p><b>{t("agent_result_memory")}:</b> '
         f'{t("agent_result_on") if memory else t("agent_result_off")} · '
         f'<b>{t("agent_result_hitl")}:</b> '
@@ -1178,14 +1182,14 @@ def render_agent_builder():
                + "\n\n===== PYTHON =====\n"
                + _build_agent_code(spec))
         st.download_button(t("agent_download_txt"), data=txt.encode("utf-8"),
-                            file_name=f"agent_{spec['name'].lower()}.txt",
+                            file_name=f"agent_{slug}.txt",
                             mime="text/plain", use_container_width=True,
                             key="agent_dl_txt")
     with c2:
         pdf = _agent_pdf_bytes(spec)
         if pdf:
             st.download_button(t("agent_download_pdf"), data=pdf,
-                                file_name=f"agent_{spec['name'].lower()}.pdf",
+                                file_name=f"agent_{slug}.pdf",
                                 mime="application/pdf",
                                 use_container_width=True, key="agent_dl_pdf")
         else:
@@ -1194,7 +1198,7 @@ def render_agent_builder():
     with c3:
         st.download_button(t("agent_download_py"),
                             data=_build_agent_code(spec).encode("utf-8"),
-                            file_name=f"agent_{spec['name'].lower()}.py",
+                            file_name=f"agent_{slug}.py",
                             mime="text/x-python",
                             use_container_width=True, key="agent_dl_py")
 
@@ -1207,15 +1211,17 @@ def render_agent_builder():
 def _build_context():
     parts = []
     if st.session_state.get("source_name"):
-        df = st.session_state.df
-        parts.append(f"Dataset: {st.session_state.source_name}, "
-                     f"{len(df)} rows, {len(df.columns)} columns.")
-        parts.append(f"Columns: {list(df.columns)}")
+        df = st.session_state.get("df")
+        if df is not None:
+            parts.append(f"Dataset: {st.session_state.source_name}, "
+                         f"{len(df)} rows, {len(df.columns)} columns.")
+            parts.append(f"Columns: {list(df.columns)[:50]}")  # cap for token size
     if st.session_state.get("target"):
         parts.append(f"Target: {st.session_state.target} "
                      f"({st.session_state.task}).")
-    if st.session_state.get("results") is not None:
-        parts.append("Leaderboard:\n" + st.session_state.results.to_string(index=False))
+    results = st.session_state.get("results")
+    if results is not None and not results.empty:
+        parts.append("Leaderboard:\n" + results.head(5).to_string(index=False))
     return "\n".join(parts) if parts else "No dataset loaded yet."
 
 
@@ -1256,7 +1262,8 @@ def render_chat():
 
     st.divider()
     for role, text in st.session_state.chat_history:
-        safe = text.replace("\n", "<br>")
+        # Escape the model output — a rogue response must not break the page.
+        safe = html.escape(text).replace("\n", "<br>")
         border = "#00F0FF" if role == "user" else "#D4AF37"
         label = t("chat_you") if role == "user" else t("chat_assistant")
         _html(f'<div class="card" style="border-left:3px solid {border};">'

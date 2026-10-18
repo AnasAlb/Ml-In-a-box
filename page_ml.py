@@ -49,13 +49,20 @@ def _theme_colors():
             "up": "#059669", "down": "#DC2626"}
 
 
+def _html(markup: str):
+    try:
+        st.html(markup)
+    except AttributeError:
+        st.markdown(markup, unsafe_allow_html=True)
+
+
 # ============================================================ HOME
 def render_home():
     user = auth.current_user()
     col_left, col_right = st.columns([1.4, 1], gap="large")
 
     with col_left:
-        st.markdown(
+        _html(
             '<div class="hero" style="text-align:left; padding: 3rem 2.5rem; '
             'margin-bottom: 0; min-height: 320px;">'
             f'<h1 style="font-size: 3.2rem;">{t("hero_title")}</h1>'
@@ -65,7 +72,7 @@ def render_home():
             '<span class="pill purple">explainable</span>'
             '<span class="pill">end-to-end</span>'
             '</div>'
-            '</div>', unsafe_allow_html=True)
+            '</div>')
 
     with col_right:
         ui.render_robot("")
@@ -90,20 +97,14 @@ def render_home():
 
     f1, f2, f3 = st.columns(3)
     with f1:
-        st.markdown(
-            f'<div class="card"><h4>{t("home_card_1_title")}</h4>'
-            f'<p>{t("home_card_1_body")}</p></div>',
-            unsafe_allow_html=True)
+        _html(f'<div class="card"><h4>{t("home_card_1_title")}</h4>'
+              f'<p>{t("home_card_1_body")}</p></div>')
     with f2:
-        st.markdown(
-            f'<div class="card"><h4>{t("home_card_2_title")}</h4>'
-            f'<p>{t("home_card_2_body")}</p></div>',
-            unsafe_allow_html=True)
+        _html(f'<div class="card"><h4>{t("home_card_2_title")}</h4>'
+              f'<p>{t("home_card_2_body")}</p></div>')
     with f3:
-        st.markdown(
-            f'<div class="card"><h4>{t("home_card_3_title")}</h4>'
-            f'<p>{t("home_card_3_body")}</p></div>',
-            unsafe_allow_html=True)
+        _html(f'<div class="card"><h4>{t("home_card_3_title")}</h4>'
+              f'<p>{t("home_card_3_body")}</p></div>')
 
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
     status = torch_status()
@@ -117,14 +118,13 @@ def render_home():
         user_info = f" &nbsp;·&nbsp; {t('home_signed_in', name=user['display_name'])} ({mods})"
 
     c = _theme_colors()
-    st.markdown(
+    _html(
         f'<div style="background: {c["bg"]}; border: 1px solid {c["border"]}; '
         f'border-radius: 12px; padding: 1rem 1.5rem; display: flex; '
         f'align-items: center; gap: 10px;">'
         f'<div style="width: 10px; height: 10px; border-radius: 50%; '
         f'background: {status_color};"></div>'
-        f'<span style="font-size: 0.9rem;">{status_text}{user_info}</span></div>',
-        unsafe_allow_html=True)
+        f'<span style="font-size: 0.9rem;">{status_text}{user_info}</span></div>')
 
     ui.sisyphus()
 
@@ -235,13 +235,12 @@ def _render_column_card(name, series, info, description, kind):
     conv = (f'<p style="font-size:0.85rem;margin-top:0.5rem;">'
             f'<b>{t("prof_auto_conversion")}</b> {conversion}</p>'
             if conversion else "")
-    st.markdown(
+    _html(
         f'<div class="card"><h4>{name} '
         f'<span class="pill {color}">{label}</span>{miss_pill}'
         f'<span class="pill">{t("prof_dtype", t=info["type"])}</span>'
         f'<span class="pill">{t("prof_distinct", n=unique)}</span></h4>'
-        f'<p><b>{t("prof_likely_meaning")}</b> {description}</p>{conv}</div>',
-        unsafe_allow_html=True)
+        f'<p><b>{t("prof_likely_meaning")}</b> {description}</p>{conv}</div>')
 
 
 def _dataset_chat_ctx(df, descs):
@@ -301,10 +300,10 @@ def _render_dataset_chat():
         safe = text.replace("\n", "<br>")
         border = "#00F0FF" if role == "user" else "#D4AF37"
         name = t("prof_you") if role == "user" else t("prof_assistant")
-        st.markdown(
+        _html(
             f'<div class="card" style="border-left:3px solid {border};">'
             f'<p style="font-weight:600;margin-bottom:0.3rem;">{name}</p>'
-            f'<p>{safe}</p></div>', unsafe_allow_html=True)
+            f'<p>{safe}</p></div>')
 
     with st.form("prof_chat_form", clear_on_submit=True):
         c1, c2 = st.columns([5, 1])
@@ -354,10 +353,8 @@ def _render_uploaded_profile():
         st.info(t("prof_no_conversions"))
     else:
         for line in plan:
-            st.markdown(
-                f'<div class="card" style="padding:0.7rem 1rem;">'
-                f'<p style="margin:0;">🧪 {line}</p></div>',
-                unsafe_allow_html=True)
+            _html(f'<div class="card" style="padding:0.7rem 1rem;">'
+                  f'<p style="margin:0;">🧪 {line}</p></div>')
 
     _render_dataset_chat()
 
@@ -370,6 +367,7 @@ def _render_uploaded_profile():
     with c2:
         if st.button(t("prof_reupload_btn"), use_container_width=True,
                      key="prof_reupload"):
+            # Full reset of pipeline state
             for k in ("df", "source_path", "source_name", "load_notes",
                       "profile", "_col_desc_cache", "target", "task",
                       "features", "mode", "model_keys", "proposed_plan",
@@ -418,62 +416,81 @@ def _render_loaded_model_predictor(pipeline, meta):
                 except Exception:
                     pass
             pred = pipeline.predict(row)[0]
-            st.markdown(
+            _html(
                 f'<div class="card" style="border-left:3px solid {c["accent"]};">'
                 f'<h4>{t("prof_model_prediction")}</h4>'
                 f'<p style="font-size:1.6rem;font-weight:800;color:{c["accent"]};">'
-                f'{target} = {pred}</p></div>',
-                unsafe_allow_html=True)
+                f'{target} = {pred}</p></div>')
             if explain_clicked:
                 _render_row_xai(pipeline, row, features)
         except Exception as e:
             st.error(t("predict_failed", err=f"{type(e).__name__}: {e}"))
 
 
-# ============================================================ PROFILE
+# ============================================================ PROFILE (THE SMART HUB)
 def render_profile():
     ui.hero(t("prof_hero_title"), t("prof_hero_sub"),
             pills=[t("prof_pill_1"), t("prof_pill_2"), t("prof_pill_3")])
 
-    tab_data, tab_model = st.tabs([
-        t("prof_upload_dataset_tab"), t("prof_upload_model_tab")])
+    tab_data, tab_cv, tab_model = st.tabs([
+        t("prof_upload_dataset_tab"), 
+        t("prof_upload_cv_tab"), 
+        t("prof_upload_model_tab")
+    ])
 
     with tab_data:
         if st.session_state.get("df") is not None:
             _render_uploaded_profile()
-            return
-        uploaded = st.file_uploader(
-            t("prof_upload_label"),
-            type=["csv", "xlsx", "xls"],
-            key="profile_dataset_uploader")
-        st.caption(t("prof_try_hint"))
-        if uploaded is None:
-            return
-        os.makedirs("outputs", exist_ok=True)
-        suffix = os.path.splitext(uploaded.name)[1]
-        tmp = os.path.join("outputs", f"_upload_{uuid.uuid4().hex[:6]}{suffix}")
-        with open(tmp, "wb") as f:
-            f.write(uploaded.getbuffer())
-        try:
-            df, notes = load_table_with_notes(tmp)
-        except Exception as e:
-            st.error(f"Could not read: {type(e).__name__}: {e}")
-            return
-        st.session_state.df = df
-        st.session_state.source_path = tmp
-        st.session_state.source_name = uploaded.name
-        st.session_state.load_notes = notes
-        st.session_state.profile = profile_df(df)
-        st.session_state.log = [
-            f"Ingested {len(df)} rows × {len(df.columns)} cols from {uploaded.name}"]
-        st.rerun()
+        else:
+            uploaded = st.file_uploader(
+                t("prof_upload_label"),
+                type=["csv", "xlsx", "xls"],
+                key="profile_dataset_uploader")
+            st.caption(t("prof_try_hint"))
+            if uploaded is not None:
+                os.makedirs("outputs", exist_ok=True)
+                suffix = os.path.splitext(uploaded.name)[1]
+                tmp = os.path.join("outputs", f"_upload_{uuid.uuid4().hex[:6]}{suffix}")
+                with open(tmp, "wb") as f:
+                    f.write(uploaded.getbuffer())
+                try:
+                    df, notes = load_table_with_notes(tmp)
+                except Exception as e:
+                    st.error(f"Could not read: {type(e).__name__}: {e}")
+                else:
+                    # Clear old run state so the new dataset starts fresh
+                    for k in ("target", "task", "features", "mode", "model_keys",
+                              "proposed_plan", "clean_plan", "warnings",
+                              "plan_approved", "results", "extras", "notes",
+                              "advice", "importance", "output_folder", "retried",
+                              "agent_target_suggestion", "learning_mode",
+                              "metric_preference", "interaction_proposals",
+                              "interaction_specs", "prof_chat", "manual_params",
+                              "enhancement_specs", "_tune_result", "_agent_suggested_hp"):
+                        st.session_state.pop(k, None)
+                    st.session_state.df = df
+                    st.session_state.source_path = tmp
+                    st.session_state.source_name = uploaded.name
+                    st.session_state.load_notes = notes
+                    st.session_state.profile = profile_df(df)
+                    st.session_state.log = [
+                        f"Ingested {len(df)} rows × {len(df.columns)} cols from {uploaded.name}"]
+                    
+                    detected = auto_detect_modality(df)
+                    st.session_state.modality = detected
+                    
+                    st.rerun()
+
+    with tab_cv:
+        from page_cv import render_cv
+        render_cv()
 
     with tab_model:
-        st.markdown(
+        _html(
             f'<div class="card">'
             f'<h4>{t("prof_model_intro_title")}</h4>'
             f'<p>{t("prof_model_intro_body")}</p>'
-            f'</div>', unsafe_allow_html=True)
+            f'</div>')
 
         up = st.file_uploader(
             t("prof_model_drop_label"),
@@ -483,32 +500,29 @@ def render_profile():
 
         if up is None:
             st.info(t("prof_model_waiting"))
-            return
+        else:
+            try:
+                pipeline, meta = _load_model_zip(up.getvalue())
+            except Exception as e:
+                st.error(t("prof_model_read_fail", err=f"{type(e).__name__}: {e}"))
+                st.caption(t("prof_model_hint"))
+            else:
+                c1, c2, c3 = st.columns(3)
+                with c1: ui.stat(meta.get("best_model", "?"), t("prof_model_best"))
+                with c2: ui.stat(meta.get("target", "?"), t("prof_model_target"))
+                with c3: ui.stat(meta.get("task", "?"), t("prof_model_task"))
 
-        try:
-            pipeline, meta = _load_model_zip(up.getvalue())
-        except Exception as e:
-            st.error(t("prof_model_read_fail", err=f"{type(e).__name__}: {e}"))
-            st.caption(t("prof_model_hint"))
-            return
+                _html(
+                    f'<div class="card"><h4>{t("prof_model_features_title")}</h4>'
+                    f'<p>{", ".join(meta.get("features", [])) or "—"}</p></div>')
 
-        c1, c2, c3 = st.columns(3)
-        with c1: ui.stat(meta.get("best_model", "?"), t("prof_model_best"))
-        with c2: ui.stat(meta.get("target", "?"), t("prof_model_target"))
-        with c3: ui.stat(meta.get("task", "?"), t("prof_model_task"))
-
-        st.markdown(
-            f'<div class="card"><h4>{t("prof_model_features_title")}</h4>'
-            f'<p>{", ".join(meta.get("features", [])) or "—"}</p></div>',
-            unsafe_allow_html=True)
-
-        st.session_state["_loaded_model"] = pipeline
-        st.session_state["_loaded_model_meta"] = meta
-        st.success(t("prof_model_loaded"))
-        _render_loaded_model_predictor(pipeline, meta)
+                st.session_state["_loaded_model"] = pipeline
+                st.session_state["_loaded_model_meta"] = meta
+                st.success(t("prof_model_loaded"))
+                _render_loaded_model_predictor(pipeline, meta)
 
 
-# ============================================================ XAI — GLOBAL
+# ============================================================ XAI
 def _pipeline_inner_model(pipeline):
     if hasattr(pipeline, "named_steps"):
         return pipeline.named_steps.get("model", pipeline)
@@ -583,14 +597,13 @@ def _render_global_xai(extras, X_test):
     c = _theme_colors()
     accent = c["accent"]
 
-    st.markdown(
+    _html(
         f'<div style="background: {c["bg"]}; border: 2px solid {accent}; '
         f'border-radius: 20px; padding: 2rem; margin: 2rem 0;">'
         f'<h2 style="color: {accent}; margin: 0 0 0.5rem 0;">'
         f'{t("xai_global_title")}</h2>'
         f'<p style="margin: 0; color: {c["text_muted"]}; font-size: 0.95rem;">'
-        f'{t("xai_global_body")}</p></div>',
-        unsafe_allow_html=True)
+        f'{t("xai_global_body")}</p></div>')
 
     names, mean_abs = _compute_shap_global(pipeline, X_test, extras["features"])
 
@@ -614,7 +627,7 @@ def _render_global_xai(extras, X_test):
     else:
         st.caption(t("xai_shap_unavailable"))
         imp = st.session_state.get("importance")
-        if imp is not None and len(imp):
+        if imp is not None and not imp.empty:
             fig = px.bar(imp.head(15), x="importance", y="feature",
                          orientation="h", color="importance",
                          color_continuous_scale=[[0, c["border"]], [1, accent]])
@@ -628,7 +641,6 @@ def _render_global_xai(extras, X_test):
             st.plotly_chart(fig, use_container_width=True)
 
 
-# ============================================================ XAI — ROW
 def _render_row_xai(pipeline, X_row, features):
     c = _theme_colors()
     st.markdown(t("xai_row_title"))
@@ -747,84 +759,32 @@ def _advanced_nn_panel():
     st.session_state.nn_config = cfg
 
 
-# ============================================================ MANUAL HYPERPARAMS
-def _render_manual_hyperparams(model_keys, task):
-    if not model_keys:
-        return {}
-    st.markdown(
-        '<div class="card"><h4>⚙️ Hyperparameters</h4>'
-        '<p>You picked these by hand, so you can tune each one.</p></div>',
-        unsafe_allow_html=True)
-    cat = catalog(task, 10000)
-    overrides = {}
-    for key in model_keys:
-        if key not in cat or key == "mlp":
-            continue
-        params = hyperparams(key, task)
-        if not params:
-            continue
-        with st.expander(f"**{cat[key]['name']}**", expanded=False):
-            overrides[key] = {}
-            cols = st.columns(2)
-            for i, p in enumerate(params):
-                with cols[i % 2]:
-                    wk = f"hp_{key}_{p['name']}"
-                    if p["kind"] == "int":
-                        overrides[key][p["name"]] = st.slider(
-                            p["name"], int(p["min"]), int(p["max"]),
-                            int(p["default"]), int(p["step"]),
-                            help=p.get("help", ""), key=wk)
-                    elif p["kind"] == "float":
-                        overrides[key][p["name"]] = st.number_input(
-                            p["name"], float(p["min"]), float(p["max"]),
-                            float(p["default"]), float(p["step"]),
-                            help=p.get("help", ""), key=wk)
-                    elif p["kind"] == "choice":
-                        overrides[key][p["name"]] = st.selectbox(
-                            p["name"], p["choices"],
-                            index=p["choices"].index(p["default"])
-                            if p["default"] in p["choices"] else 0,
-                            help=p.get("help", ""), key=wk)
-    return overrides
-
-
 # ============================================================ ENHANCEMENTS
 def _render_enhancement_panel(df, features, target):
-    numeric_feats = [f for f in features
-                     if pd.api.types.is_numeric_dtype(df[f])]
+    numeric_feats = [f for f in features if pd.api.types.is_numeric_dtype(df[f])]
     if not numeric_feats:
         return []
 
-    heading_col, help_col = st.columns([9, 1])
-    with heading_col:
-        st.markdown(f"### {t('setup_step45')}")
-    with help_col:
-        with st.popover("❓", help=t("setup_enhance_tooltip")):
-            st.markdown(f"**{t('setup_enhance_when')}**")
-            st.markdown(f"- {t('setup_enhance_square')}")
-            st.markdown(f"- {t('setup_enhance_sqrt')}")
-            st.markdown(f"- {t('setup_enhance_log')}")
-            st.markdown(f"- {t('setup_enhance_cube')}")
-
-    c = _theme_colors()
-    st.markdown(
-        f'<div class="card" style="border-left:3px solid {c["accent"]};">'
-        f'<p>{t("setup_enhance_intro")}</p></div>',
-        unsafe_allow_html=True)
+    st.markdown(f"### {t('setup_step45')}")
+    
+    with st.expander(t("setup_enhance_tooltip"), expanded=False):
+        st.markdown(f"**{t('setup_enhance_when')}**")
+        st.markdown(f"- {t('setup_enhance_square')}")
+        st.markdown(f"- {t('setup_enhance_sqrt')}")
+        st.markdown(f"- {t('setup_enhance_log')}")
+        st.markdown(f"- {t('setup_enhance_cube')}")
+        st.info(t("setup_enhance_intro"))
 
     specs = st.session_state.get("enhancement_specs") or []
 
     c1, c2, c3 = st.columns([2, 2, 1])
     with c1:
-        col = st.selectbox(t("setup_enhance_feature"),
-                            numeric_feats, key="enh_col")
+        col = st.selectbox(t("setup_enhance_feature"), numeric_feats, key="enh_col")
     with c2:
-        op = st.selectbox(t("setup_enhance_transform"),
-                           ["square", "sqrt", "log1p", "cube"], key="enh_op")
+        op = st.selectbox(t("setup_enhance_transform"), ["square", "sqrt", "log1p", "cube"], key="enh_op")
     with c3:
         st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
-        if st.button(t("setup_enhance_add"), key="enh_add",
-                     use_container_width=True):
+        if st.button(t("setup_enhance_add"), key="enh_add", use_container_width=True):
             specs.append({"col": col, "op": op, "name": f"{col}_{op}"})
             st.session_state["enhancement_specs"] = specs
             st.rerun()
@@ -864,24 +824,6 @@ def _apply_enhancements(df, specs):
     return df
 
 
-# ============================================================ RESET
-def _reset_stages():
-    for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings",
-              "results", "extras", "notes", "advice", "importance",
-              "output_folder", "retried", "_pdf_path", "_tune_result",
-              "_agent_suggested_hp"):
-        st.session_state.pop(k, None)
-
-
-def _reset_modality():
-    _reset_stages()
-    for k in ("target", "task", "features", "mode", "model_keys",
-              "learning_mode", "metric_preference", "interaction_proposals",
-              "interaction_specs", "manual_params", "enhancement_specs",
-              "_show_enhance_ui"):
-        st.session_state.pop(k, None)
-
-
 # ============================================================ SETUP
 def _stage_setup():
     df = st.session_state.df
@@ -894,36 +836,30 @@ def _stage_setup():
         st.divider()
     else:
         st.markdown(t("setup_ml_step1"))
-
         use_dl = st.session_state.get("learning_mode") == "dl" and can_dl
 
         with st.expander(t("setup_advanced_dl_toggle"), expanded=False):
             st.caption(t("setup_advanced_dl_help"))
-            use_dl = st.checkbox("Enable Deep Learning", value=use_dl,
-                                  key="setup_dl_checkbox",
-                                  disabled=not can_dl)
+            use_dl = st.checkbox("Enable Deep Learning", value=use_dl, key="setup_dl_checkbox", disabled=not can_dl)
 
         st.session_state.learning_mode = "dl" if use_dl else "ml"
-
-        mode_title = (t("setup_dl_mode_title") if use_dl
-                      else t("setup_ml_mode_title"))
-        mode_body = (t("setup_dl_mode_body") if use_dl
-                     else t("setup_ml_mode_body"))
+        mode_title = (t("setup_dl_mode_title") if use_dl else t("setup_ml_mode_title"))
+        mode_body = (t("setup_dl_mode_body") if use_dl else t("setup_ml_mode_body"))
         c = _theme_colors()
-        st.markdown(
+        
+        _html(
             f'<div class="card" style="border-left:3px solid {c["accent"]};">'
-            f'<h4>{mode_title}</h4><p>{mode_body}</p></div>',
-            unsafe_allow_html=True)
+            f'<h4>{mode_title}</h4><p>{mode_body}</p></div>')
+            
         if use_dl:
             with st.expander(t("setup_nn_expander"), expanded=True):
                 _advanced_nn_panel()
         st.divider()
         st.markdown(t("setup_step2"))
 
-    st.markdown(
+    _html(
         f'<div class="card"><h4>{t("setup_agent_card_title")}</h4>'
-        f'<p>{t("setup_agent_card_body")}</p></div>',
-        unsafe_allow_html=True)
+        f'<p>{t("setup_agent_card_body")}</p></div>')
     if st.button(t("setup_agent_btn"), key="setup_agent_btn"):
         with st.spinner(t("setup_agent_reading")):
             rec = recommend_target(df)
@@ -933,23 +869,18 @@ def _stage_setup():
 
     suggestion = st.session_state.get("agent_target_suggestion")
     if suggestion:
-        st.success(t("setup_agent_suggests",
-                     t=suggestion["target"], task=suggestion["task"],
-                     reason=suggestion["reason"]))
+        st.success(t("setup_agent_suggests", t=suggestion["target"], task=suggestion["task"], reason=suggestion["reason"]))
 
     options = list(df.columns)
     default_idx = 0
     if suggestion and suggestion["target"] in options:
         default_idx = options.index(suggestion["target"])
-    target = st.selectbox(t("setup_target_label"), options=options,
-                          index=default_idx, key="target_pick")
+    target = st.selectbox(t("setup_target_label"), options=options, index=default_idx, key="target_pick")
     guess, conf, reason = task_evidence(df[target])
     st.info(t("setup_reading", task=guess, conf=conf, reason=reason))
 
     usable, dropped = select_features(df, target)
-    features = st.multiselect(t("setup_features_label"),
-                               options=[c for c in df.columns if c != target],
-                               default=usable, key="features_pick")
+    features = st.multiselect(t("setup_features_label"), options=[c for c in df.columns if c != target], default=usable, key="features_pick")
     for c, why in dropped:
         if c in features:
             st.warning(t("setup_feature_warn", c=c, why=why))
@@ -959,24 +890,23 @@ def _stage_setup():
         st.error(t("setup_nlp_no_text"))
 
     metric_preference = "balanced"
+    use_smote = False
     if guess == "classification":
         st.markdown(t("setup_step3"))
-        choice = st.radio(
-            t("setup_metric_label"),
-            [t("setup_metric_balanced"),
-             t("setup_metric_precision"),
-             t("setup_metric_recall")],
-            index=0, key="metric_preference_radio")
-        if choice == t("setup_metric_precision"):
-            metric_preference = "precision"
-        elif choice == t("setup_metric_recall"):
-            metric_preference = "recall"
+        choice = st.radio(t("setup_metric_label"), [t("setup_metric_balanced"), t("setup_metric_precision"), t("setup_metric_recall")], index=0, key="metric_preference_radio")
+        if choice == t("setup_metric_precision"): metric_preference = "precision"
+        elif choice == t("setup_metric_recall"): metric_preference = "recall"
         st.session_state.metric_preference = metric_preference
+        
+        use_smote = st.checkbox(
+            "Apply SMOTE (Synthetic Minority Over-sampling Technique)", 
+            value=False, 
+            help="Generate synthetic examples of the minority class to balance the dataset during training. Highly recommended for imbalanced data."
+        )
 
     st.markdown(t("setup_step4"))
     if st.button(t("setup_inter_btn"), key="setup_inter_btn"):
-        numeric_chosen = [c for c in features
-                          if pd.api.types.is_numeric_dtype(df[c])]
+        numeric_chosen = [c for c in features if pd.api.types.is_numeric_dtype(df[c])]
         if len(numeric_chosen) < 2:
             st.info(t("setup_inter_need_two"))
         else:
@@ -989,9 +919,7 @@ def _stage_setup():
     selected_interactions = []
     if proposals:
         for i, p in enumerate(proposals):
-            keep = st.checkbox(
-                f"`{p['name']}` = {p['a']} {p['op']} {p['b']} — {p.get('reason', '')}",
-                value=True, key=f"ix_prop_{i}")
+            keep = st.checkbox(f"`{p['name']}` = {p['a']} {p['op']} {p['b']} — {p.get('reason', '')}", value=True, key=f"ix_prop_{i}")
             if keep:
                 selected_interactions.append(p)
     st.session_state.interaction_specs = selected_interactions
@@ -1000,26 +928,16 @@ def _stage_setup():
     st.session_state["enhancement_specs"] = enhancements
 
     st.markdown(t("setup_step5"))
-    mode_label = st.radio(t("setup_mode_label"),
-                          [t("setup_mode_auto"), t("setup_mode_manual")],
-                          key="model_mode_radio")
+    mode_label = st.radio(t("setup_mode_label"), [t("setup_mode_auto"), t("setup_mode_manual")], key="model_mode_radio")
     mode = "auto" if mode_label == t("setup_mode_auto") else "manual"
     model_keys = []
     manual_overrides = {}
     if mode == "manual":
-        learning_mode = (st.session_state.get("learning_mode", "ml")
-                         if modality == "tabular" else "all")
-        nn_cfg = (st.session_state.get("nn_config", DEFAULT_NN_CONFIG)
-                  if modality == "tabular" else None)
-        cat = (nlp_catalog(int(len(df) * 0.8)) if modality == "nlp"
-               else catalog(guess, int(len(df) * 0.8),
-                            nn_config=nn_cfg, mode=learning_mode))
+        learning_mode = (st.session_state.get("learning_mode", "ml") if modality == "tabular" else "all")
+        nn_cfg = (st.session_state.get("nn_config", DEFAULT_NN_CONFIG) if modality == "tabular" else None)
+        cat = (nlp_catalog(int(len(df) * 0.8)) if modality == "nlp" else catalog(guess, int(len(df) * 0.8), nn_config=nn_cfg, mode=learning_mode))
         labels = {k: v["name"] for k, v in cat.items()}
-        model_keys = st.multiselect(t("setup_manual_label"),
-                                     options=list(labels.keys()),
-                                     format_func=lambda k: labels[k],
-                                     default=list(labels.keys())[:3],
-                                     key="manual_models_pick")
+        model_keys = st.multiselect(t("setup_manual_label"), options=list(labels.keys()), format_func=lambda k: labels[k], default=list(labels.keys())[:3], key="manual_models_pick")
         if modality == "tabular":
             manual_overrides = _render_manual_hyperparams(model_keys, guess)
     st.session_state.manual_params = manual_overrides
@@ -1027,15 +945,53 @@ def _stage_setup():
     if not (target and features):
         st.info(t("setup_pick_hint"))
         return
-    if st.button(t("setup_continue_btn"), type="primary",
-                 key="setup_continue_btn"):
-        _reset_stages()
+    if st.button(t("setup_continue_btn"), type="primary", key="setup_continue_btn"):
+        for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings", "results", "extras", "notes", "advice", "importance", "output_folder", "retried", "_pdf_path", "_tune_result", "_agent_suggested_hp"):
+            st.session_state.pop(k, None)
         st.session_state.target = target
         st.session_state.task = guess
         st.session_state.features = features
         st.session_state.mode = mode
         st.session_state.model_keys = model_keys
+        st.session_state.use_smote = use_smote
         st.rerun()
+
+
+def _render_manual_hyperparams(model_keys, task):
+    """Render input widgets for manual hyperparameter selection."""
+    if not model_keys:
+        return {}
+    
+    overrides = {}
+    for key in model_keys:
+        p_defs = hyperparams(key, task)
+        if not p_defs:
+            continue
+        
+        with st.expander(f"⚙️ Hyperparameters for {key}", expanded=False):
+            model_params = {}
+            for p in p_defs:
+                if p["kind"] == "int":
+                    model_params[p["name"]] = st.slider(
+                        p["name"], int(p["min"]), int(p["max"]), 
+                        int(p["default"]), int(p["step"]), 
+                        help=p.get("help", ""), key=f"manual_hp_{key}_{p['name']}"
+                    )
+                elif p["kind"] == "float":
+                    model_params[p["name"]] = st.number_input(
+                        p["name"], float(p["min"]), float(p["max"]), 
+                        float(p["default"]), float(p["step"]), 
+                        help=p.get("help", ""), key=f"manual_hp_{key}_{p['name']}"
+                    )
+                elif p["kind"] == "choice":
+                    model_params[p["name"]] = st.selectbox(
+                        p["name"], p["choices"], 
+                        index=p["choices"].index(p["default"]) if p["default"] in p["choices"] else 0, 
+                        help=p.get("help", ""), key=f"manual_hp_{key}_{p['name']}"
+                    )
+            overrides[key] = model_params
+            
+    return overrides
 
 
 # ============================================================ PLAN
@@ -1047,8 +1003,7 @@ def _stage_plan():
         with st.spinner(t("plan_spinner")):
             proposed = get_plan(df)
         clean, warnings = validate_plan(proposed, df)
-        restricted = restrict_plan(clean,
-                                    st.session_state.features or list(df.columns))
+        restricted = restrict_plan(clean, st.session_state.features or list(df.columns))
         restricted["drop_duplicates"] = clean.get("drop_duplicates", False)
         st.session_state.proposed_plan = proposed
         st.session_state.clean_plan = restricted
@@ -1060,8 +1015,7 @@ def _stage_plan():
     with c1:
         st.markdown(t("plan_will_happen"))
         yes, no = t("plan_yes"), t("plan_no")
-        st.write(t("plan_drop_dupes",
-                    v=(yes if restricted["drop_duplicates"] else no)))
+        st.write(t("plan_drop_dupes", v=(yes if restricted["drop_duplicates"] else no)))
         imp = restricted.get("impute") or {}
         if imp:
             st.write(t("plan_fill_empty"))
@@ -1070,8 +1024,7 @@ def _stage_plan():
         else:
             st.write(t("plan_fill_none"))
         out = restricted.get("outlier_columns") or []
-        st.write(t("plan_trim",
-                    cols=(", ".join(out) if out else t("plan_nothing"))))
+        st.write(t("plan_trim", cols=(", ".join(out) if out else t("plan_nothing"))))
     with c2:
         st.markdown(t("plan_validator"))
         if warnings:
@@ -1082,13 +1035,12 @@ def _stage_plan():
     with st.expander(t("plan_show_raw")):
         st.json(st.session_state.proposed_plan)
     c1, c2 = st.columns(2)
-    if c1.button(t("plan_approve"), type="primary", use_container_width=True,
-                 key="plan_approve_btn"):
+    if c1.button(t("plan_approve"), type="primary", use_container_width=True, key="plan_approve_btn"):
         st.session_state.plan_approved = True
         st.rerun()
-    if c2.button(t("plan_reject"), use_container_width=True,
-                 key="plan_reject_btn"):
-        _reset_stages()
+    if c2.button(t("plan_reject"), use_container_width=True, key="plan_reject_btn"):
+        for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings", "results", "extras", "notes", "advice", "importance", "output_folder", "retried", "_pdf_path", "_tune_result", "_agent_suggested_hp"):
+            st.session_state.pop(k, None)
         st.rerun()
 
 
@@ -1099,23 +1051,26 @@ def _stage_train():
     target = st.session_state.target
     task = st.session_state.task
     modality = st.session_state.get("modality", "tabular")
-    learning_mode = (st.session_state.get("learning_mode", "ml")
-                     if modality == "tabular" else "all")
-    nn_cfg = (st.session_state.get("nn_config", DEFAULT_NN_CONFIG)
-              if modality == "tabular" else None)
+    learning_mode = (st.session_state.get("learning_mode", "ml") if modality == "tabular" else "all")
+    nn_cfg = (st.session_state.get("nn_config", DEFAULT_NN_CONFIG) if modality == "tabular" else None)
     metric_preference = st.session_state.get("metric_preference", "balanced")
     interaction_specs = st.session_state.get("interaction_specs") or []
     enhancement_specs = st.session_state.get("enhancement_specs") or []
     source_name = st.session_state.get("source_name", "")
     manual_overrides = st.session_state.get("manual_params") or {}
+    use_smote = st.session_state.get("use_smote", False)
 
     df_enhanced = _apply_enhancements(df, enhancement_specs)
-    extra_cols = [s["name"] for s in enhancement_specs
-                  if s["name"] in df_enhanced.columns]
+    extra_cols = [s["name"] for s in enhancement_specs if s["name"] in df_enhanced.columns]
     features_with_enh = features + [c for c in extra_cols if c not in features]
     df_run = df_enhanced[features_with_enh + [target]]
 
     st.markdown(t("train_title"))
+    
+    with st.expander(t("train_game_title"), expanded=True):
+        st.caption(t("train_game_caption"))
+        ui.render_training_game()
+
     prog = st.progress(0, text=t("train_starting"))
     with st.spinner(t("train_spinner")):
         prog.progress(15, text=t("train_fitting"))
@@ -1127,7 +1082,8 @@ def _stage_train():
                 metric_preference=metric_preference,
                 interaction_specs=interaction_specs,
                 source_name=source_name,
-                hyperparams_overrides=manual_overrides)
+                hyperparams_overrides=manual_overrides,
+                use_smote=use_smote)
         except ValueError as e:
             prog.empty()
             st.error(t("train_stopped", err=str(e)))
@@ -1175,10 +1131,7 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
     st.markdown(f"**Tuning: {best['Model']}**")
     st.caption(f"Current test score: **{float(best[test_col]):.3f}**")
 
-    tuning_mode = st.radio(t("tune_approach"),
-                            [t("tune_approach_manual"),
-                             t("tune_approach_agent")],
-                            horizontal=True, key="tune_approach_radio")
+    tuning_mode = st.radio(t("tune_approach"), [t("tune_approach_manual"), t("tune_approach_agent")], horizontal=True, key="tune_approach_radio")
 
     p_defs = hyperparams(model_key, task)
     params_to_apply = {}
@@ -1188,27 +1141,15 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
             st.info(t("tune_no_params"))
         for p in p_defs:
             if p["kind"] == "int":
-                params_to_apply[p["name"]] = st.slider(
-                    p["name"], int(p["min"]), int(p["max"]),
-                    int(p["default"]), int(p["step"]),
-                    help=p.get("help", ""), key=f"tune_{p['name']}")
+                params_to_apply[p["name"]] = st.slider(p["name"], int(p["min"]), int(p["max"]), int(p["default"]), int(p["step"]), help=p.get("help", ""), key=f"tune_{p['name']}")
             elif p["kind"] == "float":
-                params_to_apply[p["name"]] = st.number_input(
-                    p["name"], float(p["min"]), float(p["max"]),
-                    float(p["default"]), float(p["step"]),
-                    help=p.get("help", ""), key=f"tune_{p['name']}")
+                params_to_apply[p["name"]] = st.number_input(p["name"], float(p["min"]), float(p["max"]), float(p["default"]), float(p["step"]), help=p.get("help", ""), key=f"tune_{p['name']}")
             elif p["kind"] == "choice":
-                params_to_apply[p["name"]] = st.selectbox(
-                    p["name"], p["choices"],
-                    index=p["choices"].index(p["default"])
-                    if p["default"] in p["choices"] else 0,
-                    help=p.get("help", ""), key=f"tune_{p['name']}")
+                params_to_apply[p["name"]] = st.selectbox(p["name"], p["choices"], index=p["choices"].index(p["default"]) if p["default"] in p["choices"] else 0, help=p.get("help", ""), key=f"tune_{p['name']}")
     else:
         if st.button(t("tune_agent_ask"), key="tune_agent_ask_btn"):
             with st.spinner(t("tune_agent_thinking")):
-                suggested = agent_tune_hyperparams(
-                    model_key, task,
-                    {p["name"]: p["default"] for p in p_defs})
+                suggested = agent_tune_hyperparams(model_key, task, {p["name"]: p["default"] for p in p_defs})
             st.session_state["_agent_suggested_hp"] = suggested
             st.rerun()
 
@@ -1217,8 +1158,7 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
             valid = {p["name"]: p for p in p_defs}
             cleaned = {}
             for k, v in suggested.items():
-                if k not in valid:
-                    continue
+                if k not in valid: continue
                 p = valid[k]
                 try:
                     if p["kind"] == "int":
@@ -1230,8 +1170,7 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
                         fv = max(float(p["min"]), min(float(p["max"]), fv))
                         cleaned[k] = fv
                     elif p["kind"] == "choice":
-                        if v in p["choices"]:
-                            cleaned[k] = v
+                        if v in p["choices"]: cleaned[k] = v
                 except (ValueError, TypeError):
                     continue
 
@@ -1243,24 +1182,22 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
             else:
                 st.warning(t("tune_no_params"))
 
-    if st.button(t("tune_retrain_btn"), type="primary",
-                 key="retrain_tuned_btn"):
+    if st.button(t("tune_retrain_btn"), type="primary", key="retrain_tuned_btn"):
         if not params_to_apply:
             st.warning("No parameters to apply.")
         else:
             st.session_state.pop("_tune_result", None)
             with st.spinner(t("tune_retraining")):
-                df_run_tune = st.session_state.df[
-                    st.session_state.features + [st.session_state.target]]
+                # Fix: apply enhancements to the raw df before slicing
+                enh_specs = st.session_state.get("enhancement_specs") or []
+                df_enhanced = _apply_enhancements(st.session_state.df, enh_specs)
+                df_run_tune = df_enhanced[extras["features"] + [st.session_state.target]]
+                
                 try:
                     r2, n2, e2 = train_run(
-                        df_run_tune, st.session_state.target,
-                        st.session_state.clean_plan, task, [model_key],
-                        self_check=False,
-                        nn_config=st.session_state.get("nn_config", DEFAULT_NN_CONFIG),
-                        mode=learning_mode,
-                        metric_preference=extras.get("metric_preference", "balanced"),
-                        source_name=st.session_state.get("source_name", ""),
+                        df_run_tune, st.session_state.target, st.session_state.clean_plan, task, [model_key],
+                        self_check=False, nn_config=st.session_state.get("nn_config", DEFAULT_NN_CONFIG), mode=learning_mode,
+                        metric_preference=extras.get("metric_preference", "balanced"), source_name=st.session_state.get("source_name", ""),
                         hyperparams_overrides={model_key: params_to_apply})
                     old_score = float(best[test_col])
                     new_row = r2.iloc[0]
@@ -1268,56 +1205,48 @@ def _render_inline_tuning(extras, results, task, best, test_col, learning_mode):
                     delta = new_score - old_score
 
                     explanation_prompt = (
-                        f"You are an ML engineer explaining a hyperparameter "
-                        f"change to a colleague. Old score: {old_score:.3f}, "
-                        f"new score: {new_score:.3f}, delta: {delta:+.3f}. "
-                        f"Old params: {params_to_apply}. "
-                        f"Model: {best['Model']}. Dataset rows: "
-                        f"{extras.get('n_train', '?')}. "
-                        "In 2-3 sentences, explain WHY the score changed the "
-                        "way it did. Be specific about which parameter likely "
-                        "caused what. Keep it plain and non-technical.")
+                        f"You are an ML engineer explaining a hyperparameter change to a colleague. "
+                        f"Old score: {old_score:.3f}, new score: {new_score:.3f}, delta: {delta:+.3f}. "
+                        f"Old params: {params_to_apply}. Model: {best['Model']}. Dataset rows: {extras.get('n_train', '?')}. "
+                        "In 2-3 sentences, explain WHY the score changed the way it did. Be specific about which parameter likely caused what. Keep it plain and non-technical.")
                     try:
-                        llm_explanation = (ask(explanation_prompt,
-                                                temperature=0.3) or "").strip()
+                        llm_explanation = (ask(explanation_prompt, temperature=0.3) or "").strip()
                     except Exception:
                         llm_explanation = ""
 
                     icon = "✅" if delta > 0.001 else "❌" if delta < -0.001 else "➖"
                     if llm_explanation:
-                        st.session_state["_tune_result"] = (
-                            f"**{icon} Score change: {delta:+.3f}** "
-                            f"({old_score:.3f} → {new_score:.3f})\n\n"
-                            f"{llm_explanation}")
+                        st.session_state["_tune_result"] = (f"**{icon} Score change: {delta:+.3f}** ({old_score:.3f} → {new_score:.3f})\n\n{llm_explanation}")
                     elif delta > 0.001:
-                        st.session_state["_tune_result"] = t(
-                            "tune_improved", delta=delta,
-                            old=old_score, new=new_score)
+                        st.session_state["_tune_result"] = t("tune_improved", delta=delta, old=old_score, new=new_score)
                     elif delta < -0.001:
-                        st.session_state["_tune_result"] = t(
-                            "tune_dropped", delta=delta,
-                            old=old_score, new=new_score)
+                        st.session_state["_tune_result"] = t("tune_dropped", delta=delta, old=old_score, new=new_score)
                     else:
-                        st.session_state["_tune_result"] = t(
-                            "tune_same", delta=delta)
+                        st.session_state["_tune_result"] = t("tune_same", delta=delta)
                     st.rerun()
                 except Exception as e:
-                    st.error(t("tune_retrain_fail",
-                                err=f"{type(e).__name__}: {e}"))
+                    st.error(t("tune_retrain_fail", err=f"{type(e).__name__}: {e}"))
 
     if st.session_state.get("_tune_result"):
         st.info(st.session_state["_tune_result"])
 
 
 # ============================================================ PREDICT
-def _predict_manual(pipeline, df_train, features, target, interactions=None):
+def _predict_manual(pipeline, df_train, features, target, interactions=None, enhancements=None):
     interactions = interactions or []
+    enhancements = enhancements or []
+    
     ix_names = {s["name"] for s in interactions}
-    base_features = [f for f in features if f not in ix_names]
+    enh_names = {s["name"] for s in enhancements}
+    
+    # Only ask for the original raw columns. Enhancements and interactions
+    # are computed automatically after the user submits.
+    base_features = [f for f in features if f not in ix_names and f not in enh_names and f in df_train.columns]
+    
     values = {}
     cols = st.columns(2)
     for i, f in enumerate(base_features):
-        series = df_train[f] if f in df_train.columns else pd.Series([0.0])
+        series = df_train[f]
         with cols[i % 2]:
             kind = column_kind(series, f) if len(series) else "num"
             if kind in ("num", "numunit"):
@@ -1334,25 +1263,24 @@ def _predict_manual(pipeline, df_train, features, target, interactions=None):
 
     c1, c2 = st.columns(2)
     with c1:
-        predict_clicked = st.button(t("predict_btn"), type="primary",
-                                     key="predict_manual_btn",
-                                     use_container_width=True)
+        predict_clicked = st.button(t("predict_btn"), type="primary", key="predict_manual_btn", use_container_width=True)
     with c2:
-        explain_clicked = st.button(t("prof_model_explain_btn"), type="primary",
-                                     key="predict_manual_explain_btn",
-                                     use_container_width=True)
+        explain_clicked = st.button(t("prof_model_explain_btn"), type="primary", key="predict_manual_explain_btn", use_container_width=True)
 
     if predict_clicked or explain_clicked:
         row = pd.DataFrame([values])
+        
+        # Apply enhancements first
+        row = _apply_enhancements(row, enhancements)
+        
+        # Then apply interactions
         for spec in interactions:
             a, b, op = spec["a"], spec["b"], spec["op"]
             if a in row.columns and b in row.columns:
-                if op == "ratio":
-                    row[spec["name"]] = row[a] / row[b].replace(0, np.nan)
-                elif op == "product":
-                    row[spec["name"]] = row[a] * row[b]
-                else:
-                    row[spec["name"]] = row[a] - row[b]
+                if op == "ratio": row[spec["name"]] = row[a] / row[b].replace(0, np.nan)
+                elif op == "product": row[spec["name"]] = row[a] * row[b]
+                else: row[spec["name"]] = row[a] - row[b]
+                
         try:
             row = row[features]
         except KeyError as e:
@@ -1364,19 +1292,17 @@ def _predict_manual(pipeline, df_train, features, target, interactions=None):
             st.error(t("predict_failed", err=f"{type(e).__name__}: {e}"))
             return
         c = _theme_colors()
-        st.markdown(
+        _html(
             f'<div class="card" style="border-left:3px solid {c["accent"]};">'
             f'<h4>{t("predict_result")}</h4>'
             f'<p style="font-size:1.6rem;font-weight:800;color:{c["accent"]};">'
-            f'{target} = {pred}</p></div>', unsafe_allow_html=True)
+            f'{target} = {pred}</p></div>')
         if explain_clicked:
             _render_row_xai(pipeline, row, features)
 
 
-def _predict_batch(pipeline, features, target, interactions=None):
-    uploaded = st.file_uploader(t("predict_upload_hint"),
-                                 type=["csv", "xlsx", "xls"],
-                                 key="predict_upload")
+def _predict_batch(pipeline, features, target, interactions=None, enhancements=None):
+    uploaded = st.file_uploader(t("predict_upload_hint"), type=["csv", "xlsx", "xls"], key="predict_upload")
     if uploaded is None:
         st.caption(t("predict_upload_caption"))
         return
@@ -1390,21 +1316,25 @@ def _predict_batch(pipeline, features, target, interactions=None):
     except Exception as e:
         st.error(f"Could not read: {type(e).__name__}: {e}")
         return
+        
     interactions = interactions or []
+    enhancements = enhancements or []
+    
+    # Apply enhancements
+    df_new = _apply_enhancements(df_new, enhancements)
+    
+    # Apply interactions
     for spec in interactions:
         a, b, op = spec["a"], spec["b"], spec["op"]
-        if spec["name"] in df_new.columns:
-            continue
+        if spec["name"] in df_new.columns: continue
         if a in df_new.columns and b in df_new.columns:
             try:
-                if op == "ratio":
-                    df_new[spec["name"]] = df_new[a] / df_new[b].replace(0, np.nan)
-                elif op == "product":
-                    df_new[spec["name"]] = df_new[a] * df_new[b]
-                else:
-                    df_new[spec["name"]] = df_new[a] - df_new[b]
+                if op == "ratio": df_new[spec["name"]] = df_new[a] / df_new[b].replace(0, np.nan)
+                elif op == "product": df_new[spec["name"]] = df_new[a] * df_new[b]
+                else: df_new[spec["name"]] = df_new[a] - df_new[b]
             except Exception:
                 pass
+                
     missing = [c for c in features if c not in df_new.columns]
     if missing:
         st.error(t("predict_missing", cols=", ".join(missing)))
@@ -1417,10 +1347,7 @@ def _predict_batch(pipeline, features, target, interactions=None):
     out = df_new.copy()
     out[f"predicted_{target}"] = preds
     st.dataframe(out.head(20), use_container_width=True)
-    st.download_button(t("predict_download"),
-                       data=out.to_csv(index=False).encode("utf-8"),
-                       file_name=f"predictions_{os.path.basename(tmp)}.csv",
-                       mime="text/csv")
+    st.download_button(t("predict_download"), data=out.to_csv(index=False).encode("utf-8"), file_name=f"predictions_{os.path.basename(tmp)}.csv", mime="text/csv")
 
 
 def _stage_predict():
@@ -1430,25 +1357,22 @@ def _stage_predict():
     target = extras["target"]
     pipeline = extras["best_pipeline"]
     interactions = extras.get("interactions") or []
+    enhancements = st.session_state.get("enhancement_specs") or []
     st.divider()
     st.markdown(t("results_pred_title"))
-    st.caption(t("results_pred_caption",
-                  m=extras["best_name"], target=target))
-    mode = st.radio(t("results_pred_method"),
-                    [t("results_pred_manual"), t("results_pred_upload")],
-                    horizontal=True, key="predict_mode")
+    st.caption(t("results_pred_caption", m=extras["best_name"], target=target))
+    mode = st.radio(t("results_pred_method"), [t("results_pred_manual"), t("results_pred_upload")], horizontal=True, key="predict_mode")
     if mode == t("results_pred_manual"):
-        _predict_manual(pipeline, df_train, features, target, interactions)
+        _predict_manual(pipeline, df_train, features, target, interactions, enhancements)
     else:
-        _predict_batch(pipeline, features, target, interactions)
+        _predict_batch(pipeline, features, target, interactions, enhancements)
 
 
-# ============================================================ RESULTS HELPERS
+# ============================================================ RESULTS
 def _metric_explanation(task, best, base):
     if task == "regression":
         r2 = float(best["Test R2"])
-        return t("results_metric_help", r2=r2, pct=max(r2, 0) * 100,
-                 base=float(base["Test R2"]))
+        return t("results_metric_help", r2=r2, pct=max(r2, 0) * 100, base=float(base["Test R2"]))
     f1 = float(best["F1"])
     return t("results_metric_help_clf", f1=f1, base=float(base["F1"]))
 
@@ -1456,8 +1380,7 @@ def _metric_explanation(task, best, base):
 def _why_these_models(results, task, mode, learning_mode):
     n_train = st.session_state.get("extras", {}).get("n_train", 0)
     nn_cfg = st.session_state.get("nn_config", DEFAULT_NN_CONFIG)
-    cat = (nlp_catalog(n_train) if mode == "nlp"
-           else catalog(task, n_train, nn_config=nn_cfg, mode=learning_mode))
+    cat = (nlp_catalog(n_train) if mode == "nlp" else catalog(task, n_train, nn_config=nn_cfg, mode=learning_mode))
     name_to_key = {v["name"]: k for k, v in cat.items()}
     user_manual = st.session_state.get("mode") == "manual"
     user_keys = st.session_state.get("model_keys") or []
@@ -1468,33 +1391,29 @@ def _why_these_models(results, task, mode, learning_mode):
     for _, row in results.iterrows():
         name = row["Model"]
         if name.startswith("Baseline"):
-            st.markdown(
-                f'<div class="card"><h4>{t("results_baseline")}</h4>'
-                f'<p>{t("results_baseline_body")}</p></div>',
-                unsafe_allow_html=True)
+            _html(f'<div class="card"><h4>{t("results_baseline")}</h4><p>{t("results_baseline_body")}</p></div>')
             continue
         key = name_to_key.get(name)
         user_picked = user_manual and key in user_keys
         tag = t("results_tag_user") if user_picked else t("results_tag_agent")
         pill_class = "purple" if user_picked else ""
         reason = specific.get(name) or REASON.get(key, "chosen by the agent.")
-        st.markdown(
-            f'<div class="card"><h4>{name} '
-            f'<span class="pill {pill_class}">{tag}</span></h4>'
-            f'<p>{reason}</p></div>', unsafe_allow_html=True)
+        _html(f'<div class="card"><h4>{name} <span class="pill {pill_class}">{tag}</span></h4><p>{reason}</p></div>')
 
 
 def _render_roc_pr(task, extras):
     pipeline = extras.get("best_pipeline")
     X_te = extras.get("X_test")
     y_te = extras.get("y_test")
-    if pipeline is None or X_te is None or y_te is None:
-        return
-    if not hasattr(pipeline, "predict_proba"):
-        return
-    classes = sorted(pd.Series(y_te).unique())
-    if len(classes) < 2 or len(classes) > 8:
-        return
+    if pipeline is None or X_te is None or y_te is None: return
+    if not hasattr(pipeline, "predict_proba"): return
+    
+    try:
+        classes = sorted(np.unique(y_te).tolist())
+    except Exception:
+        classes = list(pd.Series(y_te).unique())
+        
+    if len(classes) < 2 or len(classes) > 8: return
     try:
         y_prob = pipeline.predict_proba(X_te)
     except Exception:
@@ -1516,21 +1435,14 @@ def _render_roc_pr(task, extras):
         pr_auc = auc(rec, prec)
         with c1:
             fig = px.line(x=fpr, y=tpr)
-            fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1,
-                          line=dict(dash="dash", color="#94a3b8"))
+            fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line=dict(dash="dash", color="#94a3b8"))
             fig.update_traces(line=dict(color="#22d3ee", width=3))
-            fig.update_layout(height=340, title=f"ROC · AUC = {roc_auc:.3f}",
-                              paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#A1A1AA"))
+            fig.update_layout(height=340, title=f"ROC · AUC = {roc_auc:.3f}", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
             st.plotly_chart(fig, use_container_width=True)
         with c2:
             fig = px.line(x=rec, y=prec)
             fig.update_traces(line=dict(color="#e879f9", width=3))
-            fig.update_layout(height=340, title=f"PR · AUC = {pr_auc:.3f}",
-                              paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#A1A1AA"))
+            fig.update_layout(height=340, title=f"PR · AUC = {pr_auc:.3f}", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
             st.plotly_chart(fig, use_container_width=True)
 
 
@@ -1538,8 +1450,7 @@ def _render_residual_plot(extras):
     pipeline = extras.get("best_pipeline")
     X_te = extras.get("X_test")
     y_te = extras.get("y_test")
-    if pipeline is None or X_te is None or y_te is None:
-        return
+    if pipeline is None or X_te is None or y_te is None: return
     try:
         y_pred = pipeline.predict(X_te)
     except Exception:
@@ -1555,34 +1466,24 @@ def _render_residual_plot(extras):
     hi = float(max(y_true.max(), y_pred.max()))
     with c1:
         fig = px.scatter(x=y_pred, y=y_true)
-        fig.add_shape(type="line", x0=lo, y0=lo, x1=hi, y1=hi,
-                      line=dict(dash="dash", color="#94a3b8"))
+        fig.add_shape(type="line", x0=lo, y0=lo, x1=hi, y1=hi, line=dict(dash="dash", color="#94a3b8"))
         fig.update_traces(marker=dict(color="#22d3ee", size=6, opacity=0.6))
-        fig.update_layout(height=340, paper_bgcolor="rgba(0,0,0,0)",
-                          plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#A1A1AA"))
+        fig.update_layout(height=340, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
         st.plotly_chart(fig, use_container_width=True)
     with c2:
         fig = px.scatter(x=y_pred, y=residuals)
-        fig.add_shape(type="line", x0=lo, y0=0, x1=hi, y1=0,
-                      line=dict(dash="dash", color="#94a3b8"))
+        fig.add_shape(type="line", x0=lo, y0=0, x1=hi, y1=0, line=dict(dash="dash", color="#94a3b8"))
         fig.update_traces(marker=dict(color="#e879f9", size=6, opacity=0.6))
-        fig.update_layout(height=340, paper_bgcolor="rgba(0,0,0,0)",
-                          plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#A1A1AA"))
+        fig.update_layout(height=340, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown(
+    _html(
         f'<div class="card">'
-        f'<p><b>{t("results_resid_left_title")}</b> '
-        f'{t("results_resid_left_body")}</p>'
-        f'<p style="margin-top:0.6rem;">'
-        f'<b>{t("results_resid_right_title")}</b> '
-        f'{t("results_resid_right_body")}</p>'
-        f'</div>', unsafe_allow_html=True)
+        f'<p><b>{t("results_resid_left_title")}</b> {t("results_resid_left_body")}</p>'
+        f'<p style="margin-top:0.6rem;"><b>{t("results_resid_right_title")}</b> {t("results_resid_right_body")}</p>'
+        f'</div>')
 
 
-# ============================================================ RESULTS
 def _stage_results():
     results = st.session_state.results
     extras = st.session_state.extras
@@ -1605,10 +1506,9 @@ def _stage_results():
     with c2: ui.stat(f"{float(best[cv_col]):.3f}", t("results_cv"))
     with c3: ui.stat(f"{float(best[test_col]):.3f}", t("results_test"))
 
-    st.markdown(
+    _html(
         f'<div class="card"><h4>{t("results_what_numbers_title")}</h4>'
-        f'<p>{_metric_explanation(task, best, base)}</p></div>',
-        unsafe_allow_html=True)
+        f'<p>{_metric_explanation(task, best, base)}</p></div>')
 
     if mode != "nlp":
         _render_global_xai(extras, extras.get("X_test"))
@@ -1621,18 +1521,12 @@ def _stage_results():
         if mode == "nlp":
             st.markdown("**Text** → TF-IDF. **Numeric** → impute + scale.")
         else:
-            plan = engineering_summary(st.session_state.df[
-                st.session_state.features + [st.session_state.target]])
+            plan = engineering_summary(st.session_state.df[st.session_state.features + [st.session_state.target]])
             for line in plan:
                 st.markdown(f"• {line}")
 
-    fig = px.bar(results, x="Model", y=cv_col, color=cv_col,
-                 color_continuous_scale=[[0, c["border"]], [1, c["accent"]]],
-                 text=cv_col)
-    fig.update_layout(height=340, showlegend=False,
-                      paper_bgcolor="rgba(0,0,0,0)",
-                      plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#A1A1AA"))
+    fig = px.bar(results, x="Model", y=cv_col, color=cv_col, color_continuous_scale=[[0, c["border"]], [1, c["accent"]]], text=cv_col)
+    fig.update_layout(height=340, showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
     fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1649,15 +1543,35 @@ def _stage_results():
             if extras.get("confusion") is not None:
                 st.markdown(t("results_confusion"))
                 cm = extras["confusion"]
-                fig = px.imshow(cm.values,
-                                x=[cc.replace("Predicted ", "") for cc in cm.columns],
-                                y=[rr.replace("Actual ", "") for rr in cm.index],
-                                color_continuous_scale=[[0, c["border"]], [1, c["accent"]]],
-                                aspect="auto", text_auto=True)
-                fig.update_layout(height=420,
-                                  paper_bgcolor="rgba(0,0,0,0)",
-                                  font=dict(color="#A1A1AA"))
+                fig = px.imshow(cm.values, x=[cc.replace("Predicted ", "") for cc in cm.columns], y=[rr.replace("Actual ", "") for rr in cm.index], color_continuous_scale=[[0, c["border"]], [1, c["accent"]]], aspect="auto", text_auto=True)
+                fig.update_layout(height=420, paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#A1A1AA"))
                 st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("#### 🔍 Inspect Misclassifications")
+                actual_labels = [str(x).replace("Actual ", "") for x in cm.index]
+                pred_labels = [str(x).replace("Predicted ", "") for x in cm.columns]
+                
+                col_a, col_p = st.columns(2)
+                with col_a:
+                    sel_actual = st.selectbox("Actual Class", actual_labels, key="cm_actual")
+                with col_p:
+                    sel_pred = st.selectbox("Predicted Class", pred_labels, key="cm_pred")
+                
+                if sel_actual and sel_pred:
+                    X_te = extras.get("X_test")
+                    y_te = extras.get("y_test")
+                    best_pipe = extras.get("best_pipeline")
+                    if X_te is not None and y_te is not None and best_pipe is not None:
+                        preds = best_pipe.predict(X_te)
+                        mask = (y_te.astype(str) == sel_actual) & (preds.astype(str) == sel_pred)
+                        misclassified = X_te[mask].copy()
+                        if not misclassified.empty:
+                            misclassified["Actual"] = sel_actual
+                            misclassified["Predicted"] = sel_pred
+                            st.dataframe(misclassified.head(20), use_container_width=True)
+                        else:
+                            st.info("No rows found for this combination.")
+                            
         _render_roc_pr(task, extras)
 
     if task == "regression":
@@ -1671,57 +1585,40 @@ def _stage_results():
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(t("results_self_check"))
-        for line in extras.get("selfcheck", []):
-            st.info(line)
+        for line in extras.get("selfcheck", []): st.info(line)
     with c2:
         st.markdown(t("results_plain_words"))
-        for line in extras.get("explanations", []):
-            st.markdown(f"• {line}")
+        for line in extras.get("explanations", []): st.markdown(f"• {line}")
 
     _stage_predict()
 
     with st.expander(t("results_pipeline_notes")):
-        for n in notes:
-            st.write("• " + n)
+        for n in notes: st.write("• " + n)
 
     st.divider()
     st.markdown(t("results_save_export"))
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button(t("results_save_btn"), type="primary",
-                     use_container_width=True, key="save_export_btn"):
+        if st.button(t("results_save_btn"), type="primary", use_container_width=True, key="save_export_btn"):
             try:
-                folder = export_all(
-                    st.session_state.source_path, target, task,
-                    st.session_state.clean_plan, st.session_state.warnings,
-                    st.session_state.load_notes, results, notes, extras)
+                folder = export_all(st.session_state.source_path, target, task, st.session_state.clean_plan, st.session_state.warnings, st.session_state.load_notes, results, notes, extras)
                 st.session_state.output_folder = folder
                 st.success(t("results_saved_to", folder=folder))
                 st.rerun()
             except Exception as e:
                 st.error(f"Save failed: {type(e).__name__}: {e}")
     with c2:
-        st.download_button(t("results_csv_btn"),
-                            data=results.to_csv(index=False),
-                            file_name=f"leaderboard_{target}.csv",
-                            mime="text/csv", use_container_width=True,
-                            key="dl_leaderboard_btn")
+        st.download_button(t("results_csv_btn"), data=results.to_csv(index=False), file_name=f"leaderboard_{target}.csv", mime="text/csv", use_container_width=True, key="dl_leaderboard_btn")
     with c3:
         try:
-            zip_bytes = _build_model_zip(extras, target, task, results,
-                                          st.session_state.clean_plan)
-            st.download_button(t("results_model_btn"), data=zip_bytes,
-                                file_name=f"model_{target}.zip",
-                                mime="application/zip",
-                                use_container_width=True, key="dl_model_zip_btn")
+            zip_bytes = _build_model_zip(extras, target, task, results, st.session_state.clean_plan)
+            st.download_button(t("results_model_btn"), data=zip_bytes, file_name=f"model_{target}.zip", mime="application/zip", use_container_width=True, key="dl_model_zip_btn")
         except Exception as e:
-            st.button(t("results_model_btn"), disabled=True,
-                      use_container_width=True,
-                      help=t("results_model_fail", err=str(e)))
+            st.button(t("results_model_btn"), disabled=True, use_container_width=True, help=t("results_model_fail", err=str(e)))
 
-    if st.button(t("results_try_another"), use_container_width=True,
-                 key="try_another_btn"):
-        _reset_stages()
+    if st.button(t("results_try_another"), use_container_width=True, key="try_another_btn"):
+        for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings", "results", "extras", "notes", "advice", "importance", "output_folder", "retried", "_pdf_path", "_tune_result", "_agent_suggested_hp"):
+            st.session_state.pop(k, None)
         st.rerun()
 
 
@@ -1731,17 +1628,14 @@ def render_pipeline():
         ui.hero("Sign in required", "Needs an authenticated session.", pills=[])
         return
 
-    if st.session_state.get("df") is not None:
-        detected_modality = auto_detect_modality(st.session_state.df)
-        if st.session_state.get("modality") != detected_modality:
-            st.session_state.modality = detected_modality
-            _reset_modality()
-            st.rerun()
-    else:
+    if st.session_state.get("df") is None:
         ui.hero("Run Pipeline", "Load a dataset first.", pills=[])
         if st.button("🔎  Go to Data Profiler", type="primary", key="goto_prof"):
             st.session_state.page = "profile"; st.rerun()
         return
+
+    if st.session_state.get("modality") not in ("nlp", "tabular"):
+        st.session_state.modality = auto_detect_modality(st.session_state.df)
 
     modality = st.session_state.get("modality")
     if modality == "tabular" and not (auth.can_use("ml") or auth.can_use("dl")):
@@ -1755,7 +1649,8 @@ def render_pipeline():
     has_plan = bool(st.session_state.get("plan_approved"))
     has_results = "results" in st.session_state
     if not has_target and (has_plan or has_results):
-        _reset_stages()
+        for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings", "results", "extras", "notes", "advice", "importance", "output_folder", "retried", "_pdf_path", "_tune_result", "_agent_suggested_hp"):
+            st.session_state.pop(k, None)
 
     if not st.session_state.get("target"):
         _stage_setup()
@@ -1771,11 +1666,7 @@ def render_pipeline():
         _stage_plan()
         st.divider()
         if st.button("← Change target or columns", key="change_target_btn"):
-            _reset_stages()
-            for k in ("target", "task", "features", "mode", "model_keys",
-                      "metric_preference", "interaction_proposals",
-                      "interaction_specs", "manual_params",
-                      "enhancement_specs", "_show_enhance_ui"):
+            for k in ("plan_approved", "proposed_plan", "clean_plan", "warnings", "results", "extras", "notes", "advice", "importance", "output_folder", "retried", "_pdf_path", "_tune_result", "_agent_suggested_hp", "target", "task", "features", "mode", "model_keys", "metric_preference", "interaction_proposals", "interaction_specs", "manual_params", "enhancement_specs", "_show_enhance_ui"):
                 st.session_state.pop(k, None)
             st.rerun()
     elif "results" not in st.session_state:
@@ -1786,8 +1677,7 @@ def render_pipeline():
 
 # ============================================================ TUNING
 def render_tuning():
-    ui.hero(t("tune_hero_title"), t("tune_hero_sub"),
-            pills=[t("tune_pill_1"), t("tune_pill_2"), t("tune_pill_3")])
+    ui.hero(t("tune_hero_title"), t("tune_hero_sub"), pills=[t("tune_pill_1"), t("tune_pill_2"), t("tune_pill_3")])
     df = st.session_state.get("df")
     source = st.session_state.get("source_name")
     if df is None or source is None:

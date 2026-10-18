@@ -90,7 +90,12 @@ def print_checkpoint(payload):
 def ask_approval():
     """Loop until the user gives a clear yes or no."""
     while True:
-        ans = input("Approve? (yes/no) > ").strip().lower()
+        try:
+            ans = input("Approve? (yes/no) > ").strip().lower()
+        except KeyboardInterrupt:
+            print("\nCancelled by the user.")
+            sys.exit(1)
+            
         if ans in ("", "y", "yes", "ok", "okay", "approve", "go"):
             return True
         if ans in ("n", "no", "cancel", "abort", "stop"):
@@ -99,49 +104,54 @@ def ask_approval():
 
 
 def main():
-    path = simple_choose_file()
-    app = build_graph()
+    try:
+        path = simple_choose_file()
+        app = build_graph()
 
-    # Unique per run so state from a previous session cannot leak in.
-    run_id = str(uuid.uuid4())[:8]
-    config = {"configurable": {"thread_id": run_id}}
-    init = {
-        "source_path": path,
-        "run_id": run_id,
-        "max_iterations": 2,
-        "log": [],
-    }
+        # Unique per run so state from a previous session cannot leak in.
+        run_id = str(uuid.uuid4())[:8]
+        config = {"configurable": {"thread_id": run_id}}
+        init = {
+            "source_path": path,
+            "run_id": run_id,
+            "max_iterations": 2,
+            "log": [],
+        }
 
-    # First pass — runs until it finishes or pauses at the human checkpoint.
-    app.invoke(init, config=config)
+        # First pass — runs until it finishes or pauses at the human checkpoint.
+        app.invoke(init, config=config)
 
-    # Handle human checkpoints (LangGraph interrupt / resume).
-    while True:
-        snap = app.get_state(config)
-        if not snap.next:
-            break
+        # Handle human checkpoints (LangGraph interrupt / resume).
+        while True:
+            snap = app.get_state(config)
+            if not snap.next:
+                break
 
-        try:
-            payload = snap.tasks[0].interrupts[0].value
-            print_checkpoint(payload)
-        except Exception:
-            print("\n--- HUMAN CHECKPOINT (no payload) ---")
+            try:
+                payload = snap.tasks[0].interrupts[0].value
+                print_checkpoint(payload)
+            except Exception:
+                print("\n--- HUMAN CHECKPOINT (no payload) ---")
 
-        if ask_approval():
-            app.invoke(Command(resume="approved"), config=config)
-        else:
-            print("\nCancelled by the user. Nothing was trained or saved.")
-            return 1
+            if ask_approval():
+                app.invoke(Command(resume="approved"), config=config)
+            else:
+                print("\nCancelled by the user. Nothing was trained or saved.")
+                return 1
 
-    final = app.get_state(config).values
+        final = app.get_state(config).values
 
-    print("\n--- AGENT TRACE ---")
-    for line in final.get("log", []):
-        print(" -", line)
+        print("\n--- AGENT TRACE ---")
+        for line in final.get("log", []):
+            print(" -", line)
 
-    if final.get("output_folder"):
-        print("\nOutput folder:", final["output_folder"])
-    return 0
+        if final.get("output_folder"):
+            print("\nOutput folder:", final["output_folder"])
+        return 0
+
+    except KeyboardInterrupt:
+        print("\n\nOperation cancelled by user.")
+        return 1
 
 
 if __name__ == "__main__":

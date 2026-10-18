@@ -29,19 +29,40 @@ def _load_embedder():
     try:
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer("all-MiniLM-L6-v2")
-        def encode(texts):
+        def encode(texts, is_query=False):
             return model.encode(texts, normalize_embeddings=True,
                                  show_progress_bar=False)
         return {"kind": "st", "encode": encode, "dim": 384}
     except Exception:
         from sklearn.feature_extraction.text import TfidfVectorizer
-        def encode(texts):
-            vec = TfidfVectorizer(stop_words="english",
-                                   ngram_range=(1, 2), sublinear_tf=True)
-            X = vec.fit_transform(texts).toarray()
-            norms = (X ** 2).sum(axis=1) ** 0.5
-            norms[norms == 0] = 1
-            return X / norms[:, None]
+
+        # TF-IDF must be *fitted on the corpus* and only ever `transform`ed
+        # for queries. Fitting on every query (as before) produced vectors of
+        # a different shape and crashed on the second question.
+        class TfidfEncoder:
+            def __init__(self):
+                self.vectorizer = TfidfVectorizer(stop_words="english",
+                                                   ngram_range=(1, 2),
+                                                   sublinear_tf=True)
+                self.fitted = False
+
+            def fit(self, texts):
+                self.vectorizer.fit(texts)
+                self.fitted = True
+
+            def transform(self, texts):
+                X = self.vectorizer.transform(texts).toarray()
+                norms = (X ** 2).sum(axis=1) ** 0.5
+                norms[norms == 0] = 1
+                return X / norms[:, None]
+
+        encoder = TfidfEncoder()
+
+        def encode(texts, is_query=False):
+            if not is_query or not encoder.fitted:
+                encoder.fit(texts)
+            return encoder.transform(texts)
+
         return {"kind": "tfidf", "encode": encode, "dim": None}
 
 
@@ -236,13 +257,13 @@ def _build_index(chunks):
     embedder = _load_embedder()
     texts = [c["text"] for c in chunks]
     if not texts: return embedder, None
-    vectors = embedder["encode"](texts)
+    vectors = embedder["encode"](texts, is_query=False)
     return embedder, vectors
 
 
 def _retrieve(query, chunks, embedder, vectors, top_k=4):
     if vectors is None or len(chunks) == 0: return []
-    q_vec = embedder["encode"]([query])[0]
+    q_vec = embedder["encode"]([query], is_query=True)[0]
     scores = vectors @ q_vec
     order = scores.argsort()[::-1][:top_k]
     return [{**chunks[int(i)], "score": float(scores[int(i)])}
@@ -350,6 +371,8 @@ def _ingest_file(up):
     st.session_state["doc_chunks"] = chunks
     st.session_state["doc_embedder"] = embedder
     st.session_state["doc_vectors"] = vectors
+    # A new document means old RAG answers are invalid.
+    st.session_state["doc_rag_history"] = []
     _reset_derived()
     st.success(f"Indexed {len(pages)} pages → {len(chunks)} chunks from {up.name}")
 

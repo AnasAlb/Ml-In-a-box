@@ -252,6 +252,10 @@ def node_export(state):
 
 
 def build_graph():
+    # Clear the global cache so a second CLI run in the same process
+    # doesn't pick up the previous run's dataset.
+    _CTX.clear()
+    
     g = StateGraph(State)
     for name, fn in [("ingest", node_ingest), ("interview", node_interview),
                       ("choose_models", node_choose_models), ("plan", node_plan),

@@ -5,6 +5,7 @@ modal assistant), watermark, Sisyphus, glossary.
 import os
 import textwrap
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 # ============================================================
@@ -352,49 +353,6 @@ def _build_theme(p: dict) -> str:
     }}
     .sisyphus em {{ color: {p['accent']}; font-style: italic; }}
 
-    /* ---------- 3D ROBOT ---------- */
-    .scene {{ width: 200px; height: 200px; perspective: 900px; margin: 3rem auto; }}
-    .cube {{
-        width: 100%; height: 100%; position: relative;
-        transform-style: preserve-3d;
-        animation: spin3d 12s infinite linear;
-    }}
-    .face {{
-        position: absolute; width: 200px; height: 200px;
-        background: {p['robot_bg']}; border: 2px solid {p['robot_border']};
-        box-shadow: 0 0 25px {p['glow']}, inset 0 0 25px {p['accent_soft']};
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        border-radius: 24px; gap: 6px;
-    }}
-    .front  {{ transform: translateZ(100px); }}
-    .back   {{ transform: rotateY(180deg) translateZ(100px); }}
-    .right  {{ transform: rotateY(90deg) translateZ(100px); }}
-    .left   {{ transform: rotateY(-90deg) translateZ(100px); }}
-    .top    {{ transform: rotateX(90deg) translateZ(100px); }}
-    .bottom {{ transform: rotateX(-90deg) translateZ(100px); }}
-    .robot-eye {{
-        width: 48px; height: 48px; background: {p['robot_eye']};
-        border-radius: 50%;
-        box-shadow: 0 0 25px {p['robot_eye_glow']},
-                    0 0 50px {p['robot_eye_glow']},
-                    inset 0 0 12px rgba(255,255,255,0.6);
-        animation: blinkRobot 4s infinite;
-    }}
-    .robot-mouth {{
-        width: 70px; height: 10px; background: {p['robot_eye']};
-        border-radius: 6px; margin-top: 12px;
-        box-shadow: 0 0 12px {p['robot_eye_glow']};
-    }}
-    @keyframes blinkRobot {{
-        0%, 88%, 100% {{ transform: scaleY(1); }}
-        92% {{ transform: scaleY(0.1); }}
-    }}
-    @keyframes spin3d {{
-        0%   {{ transform: rotateX(-15deg) rotateY(0deg); }}
-        100% {{ transform: rotateX(-15deg) rotateY(360deg); }}
-    }}
-
     /* ---------- BYTE VISUAL ---------- */
     .byte-visual {{
         position: fixed; bottom: 25px; right: 25px;
@@ -525,19 +483,250 @@ def _render_html(html: str):
         st.markdown(cleaned, unsafe_allow_html=True)
 
 
+# ============================================================
+# SMOOTH INTERACTIVE SVG ROBOT
+# ============================================================
 def render_robot(caption="Agent is ready..."):
-    caption_html = (
-        f'<p style="text-align:center;margin-top:1rem;font-size:0.9rem;">{caption}</p>'
-        if caption else ""
-    )
-    _render_html(
-        f'<div class="scene"><div class="cube">'
-        f'<div class="face front"><div class="robot-eye"></div>'
-        f'<div class="robot-eye"></div><div class="robot-mouth"></div></div>'
-        f'<div class="face back"></div><div class="face right"></div>'
-        f'<div class="face left"></div><div class="face top"></div>'
-        f'<div class="face bottom"></div></div></div>{caption_html}'
-    )
+    theme = st.session_state.get("theme", "light")
+    p = _palette(theme)
+
+    svg_html = f'''
+    <style>
+        body {{ background-color: transparent; margin: 0; padding: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }}
+        .robot-arm {{ transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 150px 120px; }}
+        .robot-wrapper:hover .robot-arm {{ transform: rotate(-45deg) translate(10px, -20px); }}
+        .blink {{ animation: blinker 4s infinite; }}
+        @keyframes blinker {{ 0%, 90%, 100% {{ opacity: 1; }} 95% {{ opacity: 0; }} }}
+        @keyframes float {{ 0%, 100% {{ transform: translateY(0px); }} 50% {{ transform: translateY(-10px); }} }}
+    </style>
+    <svg width="220" height="220" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 15px 25px {p['glow']});">
+        <g class="robot-wrapper" style="animation: float 4s ease-in-out infinite; cursor: pointer;">
+            <line x1="100" y1="40" x2="100" y2="20" stroke="{p['text_muted']}" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="100" cy="15" r="6" fill="{p['accent']}"><animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/></circle>
+            <rect x="50" y="90" width="100" height="80" rx="20" fill="{p['robot_body']}" stroke="{p['robot_border']}" stroke-width="3"/>
+            <rect x="70" y="110" width="60" height="40" rx="10" fill="{p['bg']}" stroke="{p['border']}" stroke-width="2"/>
+            <circle cx="85" cy="130" r="5" fill="{p['accent']}"/>
+            <circle cx="115" cy="130" r="5" fill="{p['accent']}"/>
+            <rect x="30" y="100" width="20" height="50" rx="10" fill="{p['robot_body']}" stroke="{p['robot_border']}" stroke-width="3"/>
+            <g class="robot-arm">
+                <rect x="150" y="100" width="20" height="50" rx="10" fill="{p['robot_body']}" stroke="{p['robot_border']}" stroke-width="3"/>
+                <circle cx="160" cy="155" r="12" fill="{p['robot_body']}" stroke="{p['robot_border']}" stroke-width="3"/>
+            </g>
+            <rect x="55" y="40" width="90" height="50" rx="25" fill="{p['robot_bg']}" stroke="{p['robot_border']}" stroke-width="3"/>
+            <rect x="70" y="55" width="60" height="20" rx="10" fill="{p['bg']}" stroke="{p['border']}" stroke-width="2"/>
+            <circle class="blink" cx="85" cy="65" r="6" fill="{p['robot_eye']}"/>
+            <circle class="blink" cx="115" cy="65" r="6" fill="{p['robot_eye']}"/>
+        </g>
+    </svg>
+    '''
+
+    components.html(svg_html, height=230, scrolling=False)
+
+    if caption:
+        st.markdown(
+            f'<p style="text-align:center;margin-top:-1rem;font-size:0.9rem;color:{p["text_muted"]};">{caption}</p>',
+            unsafe_allow_html=True
+        )
+
+
+# ============================================================
+# TRAINING GAME (TIC-TAC-TOE) — fixed minimax side-effects
+# ============================================================
+def render_training_game():
+    """Embeds a playable Tic-Tac-Toe game to entertain users during training."""
+    p = _palette(st.session_state.get("theme", "light"))
+
+    style = f"""
+        body {{
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: transparent; margin: 0; padding: 10px;
+            color: {p['text_muted']};
+        }}
+        .board {{
+            display: grid;
+            grid-template-columns: repeat(3, 70px);
+            grid-template-rows: repeat(3, 70px);
+            gap: 8px; margin-bottom: 15px;
+        }}
+        .cell {{
+            background: {p['card_bg']};
+            border: 2px solid {p['border']};
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2rem; font-weight: 800; cursor: pointer;
+            transition: all 0.2s ease; color: {p['accent']};
+        }}
+        .cell:hover:not(.x):not(.o) {{
+            background: {p['accent_soft']};
+            border-color: {p['accent']};
+        }}
+        .cell.x {{ color: {p['accent']}; text-shadow: 0 0 10px {p['glow']}; }}
+        .cell.o {{ color: {p['accent_2']}; text-shadow: 0 0 10px {p['glow_2']}; }}
+        .status {{
+            font-size: 1.1rem; margin-bottom: 15px;
+            font-weight: 600; color: {p['text']};
+            min-height: 1.5rem;
+        }}
+        button {{
+            background: {p['button_secondary_bg']};
+            color: {p['button_secondary_text']};
+            border: 1px solid {p['button_secondary_border']};
+            padding: 8px 16px; border-radius: 8px;
+            cursor: pointer; font-weight: 600;
+        }}
+        button:hover {{
+            border-color: {p['accent']};
+            color: {p['accent']};
+        }}
+    """
+
+    body = """
+        <div class="status" id="status">Your turn (X)</div>
+        <div class="board">
+            <div class="cell" data-i="0"></div>
+            <div class="cell" data-i="1"></div>
+            <div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div>
+            <div class="cell" data-i="4"></div>
+            <div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div>
+            <div class="cell" data-i="7"></div>
+            <div class="cell" data-i="8"></div>
+        </div>
+        <button onclick="resetGame()">Reset Game</button>
+
+        <script>
+            let board = ["", "", "", "", "", "", "", "", ""];
+            let currentPlayer = "X";
+            let gameActive = true;
+
+            const winConditions = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]
+            ];
+
+            const cells = document.querySelectorAll('.cell');
+            const statusDisplay = document.getElementById('status');
+
+            // Pure outcome check — must NOT mutate any game state.
+            function getOutcome(b) {
+                for (const [i, j, k] of winConditions) {
+                    if (b[i] && b[i] === b[j] && b[i] === b[k]) return b[i];
+                }
+                if (b.every(v => v !== "")) return "draw";
+                return null;
+            }
+
+            cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+
+            function handleCellClick(e) {
+                const index = parseInt(e.target.getAttribute('data-i'));
+                if (board[index] !== "" || !gameActive || currentPlayer !== "X") return;
+
+                makeMove(index, "X");
+                const outcome = getOutcome(board);
+                if (outcome === "X") {
+                    statusDisplay.innerText = "You win! 🎉";
+                    gameActive = false;
+                    return;
+                }
+                if (outcome === "draw") {
+                    statusDisplay.innerText = "It's a draw!";
+                    gameActive = false;
+                    return;
+                }
+                currentPlayer = "O";
+                statusDisplay.innerText = "AI is thinking...";
+                setTimeout(aiMove, 400);
+            }
+
+            function makeMove(index, player) {
+                board[index] = player;
+                const cell = cells[index];
+                cell.innerText = player;
+                cell.classList.add(player.toLowerCase());
+            }
+
+            function aiMove() {
+                if (!gameActive) return;
+                let bestScore = -Infinity;
+                let move = -1;
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === "") {
+                        board[i] = "O";
+                        const score = minimax(board, 0, false);
+                        board[i] = "";
+                        if (score > bestScore) {
+                            bestScore = score;
+                            move = i;
+                        }
+                    }
+                }
+                if (move === -1) return;
+                makeMove(move, "O");
+                const outcome = getOutcome(board);
+                if (outcome === "O") {
+                    statusDisplay.innerText = "AI wins! 🤖";
+                    gameActive = false;
+                    return;
+                }
+                if (outcome === "draw") {
+                    statusDisplay.innerText = "It's a draw!";
+                    gameActive = false;
+                    return;
+                }
+                currentPlayer = "X";
+                statusDisplay.innerText = "Your turn (X)";
+            }
+
+            function minimax(b, depth, isMaximizing) {
+                const outcome = getOutcome(b);
+                if (outcome === "O") return 10 - depth;
+                if (outcome === "X") return depth - 10;
+                if (outcome === "draw") return 0;
+
+                if (isMaximizing) {
+                    let best = -Infinity;
+                    for (let i = 0; i < 9; i++) {
+                        if (b[i] === "") {
+                            b[i] = "O";
+                            best = Math.max(best, minimax(b, depth + 1, false));
+                            b[i] = "";
+                        }
+                    }
+                    return best;
+                } else {
+                    let best = Infinity;
+                    for (let i = 0; i < 9; i++) {
+                        if (b[i] === "") {
+                            b[i] = "X";
+                            best = Math.min(best, minimax(b, depth + 1, true));
+                            b[i] = "";
+                        }
+                    }
+                    return best;
+                }
+            }
+
+            function resetGame() {
+                board = ["", "", "", "", "", "", "", "", ""];
+                currentPlayer = "X";
+                gameActive = true;
+                statusDisplay.innerText = "Your turn (X)";
+                cells.forEach(cell => {
+                    cell.innerText = "";
+                    cell.classList.remove('x', 'o');
+                });
+            }
+        </script>
+    """
+
+    html = ("<!DOCTYPE html><html><head><meta charset='utf-8'><style>"
+            + style + "</style></head><body>" + body + "</body></html>")
+    components.html(html, height=420)
 
 
 # ============================================================
@@ -560,6 +749,33 @@ def render_byte(tooltip="Hi, I'm Byte! Click me to chat."):
         if st.button(" ", key="byte_click", use_container_width=True):
             st.session_state["_byte_modal"] = "chat"
             st.rerun()
+
+
+@st.dialog("👋 Hi, I'm Byte!", width="large")
+def _byte_tour_dialog():
+    st.markdown(
+        "I'm your little guide for ML in a Box. Here's what each page does:"
+    )
+    items = [
+        ("🏠 Home", "the landing page — quick-start buttons and a look at the pipeline."),
+        ("🔎 Data Profiler", "upload a dataset (CSV/Excel) or a saved model (.zip)."),
+        ("⚡ Run Pipeline", "train models, explain decisions, download the result."),
+        ("📄 Doc Tools", "upload documents, ask questions with citations, summarize."),
+        ("🤖 Agent Builder", "design your own AI agent and download a blueprint."),
+        ("📖 Knowledge", "interactive concept map — AI, ML, DL, LLM, CV, NLP, Agentic."),
+        ("ℹ️ About", "who built this and what it does."),
+    ]
+    for title, desc in items:
+        st.markdown(f"**{title}** — {desc}")
+
+    st.markdown("---")
+    st.caption("Click me any time in the corner and I'll answer questions.")
+
+    if st.button("Got it — let's go!", type="primary",
+                 use_container_width=True, key="tour_close"):
+        # `_byte_tour_done` is already True (set in render_byte_chat before
+        # showing this dialog), so a rerun is enough to close it.
+        st.rerun()
 
 
 @st.dialog("🤖 Byte — your assistant", width="large")
@@ -592,12 +808,18 @@ def _byte_chat_dialog(context_hint=""):
     with st.form("byte_chat_form", clear_on_submit=True):
         q = st.text_input("Ask Byte", placeholder="e.g. what does this page do?",
                           label_visibility="collapsed", key="byte_input")
-        c1, c2 = st.columns([4, 1])
+        c1, c2, c3 = st.columns([3, 1, 1])
         with c1:
             sent = st.form_submit_button("Send", use_container_width=True,
                                           type="primary")
         with c2:
             clear = st.form_submit_button("Clear", use_container_width=True)
+        with c3:
+            close = st.form_submit_button("Close", use_container_width=True)
+
+    if close:
+        st.session_state["_byte_modal"] = None
+        st.rerun()
 
     if clear:
         st.session_state.byte_chat = []
@@ -611,46 +833,26 @@ def _byte_chat_dialog(context_hint=""):
         st.rerun()
 
 
-@st.dialog("👋 Hi, I'm Byte!", width="large")
-def _byte_tour_dialog():
-    st.markdown(
-        "I'm your little guide for ML in a Box. Here's what each page does:"
-    )
-    items = [
-        ("🏠 Home", "the landing page — quick-start buttons and a look at the pipeline."),
-        ("🔎 Data Profiler", "upload a dataset (CSV/Excel) or a saved model (.zip)."),
-        ("⚡ Run Pipeline", "train models, explain decisions, download the result."),
-        ("📄 Doc Tools", "upload documents, ask questions with citations, summarize."),
-        ("🤖 Agent Builder", "design your own AI agent and download a blueprint."),
-        ("📖 Knowledge", "interactive concept map — AI, ML, DL, LLM, CV, NLP, Agentic."),
-        ("ℹ️ About", "who built this and what it does."),
-    ]
-    for title, desc in items:
-        st.markdown(f"**{title}** — {desc}")
-
-    st.markdown("---")
-    st.caption("Click me any time in the corner and I'll answer questions.")
-
-    if st.button("Got it — let's go!", type="primary",
-                 use_container_width=True, key="tour_close"):
-        st.session_state["_byte_tour_done"] = True
-        st.rerun()
-
-
 def render_byte_chat(context_hint="", show_tour_if_new=True):
     """
     Called from app.py after render_byte(). Handles:
       - First-visit onboarding tour (once per session)
-      - Modal chat when Byte is clicked
+      - Modal chat while `_byte_modal == "chat"`
+
+    IMPORTANT: we do NOT clear `_byte_modal` after opening the chat. On every
+    Streamlit rerun (including the rerun that a form submission triggers) the
+    dialog must be re-invoked for the modal to stay open. It is only cleared
+    when the user explicitly clicks "Close" inside the dialog.
     """
-    # Tour: show once per session on first render
+    # Tour: mark done as soon as it's shown, so the X button also dismisses it
+    # permanently. The explicit "Got it" button just triggers a rerun.
     if (show_tour_if_new
-            and st.session_state.get("_byte_tour_done") is False):
+            and not st.session_state.get("_byte_tour_done")):
+        st.session_state["_byte_tour_done"] = True
         _byte_tour_dialog()
 
-    # Chat modal
+    # Chat: kept open while the flag is set (until "Close" is clicked).
     if st.session_state.get("_byte_modal") == "chat":
-        st.session_state["_byte_modal"] = None
         _byte_chat_dialog(context_hint)
 
 
@@ -675,7 +877,7 @@ def _byte_answer(question: str, context_hint: str) -> str:
 
 
 # ============================================================
-# PUBLIC HELPERS (kept identical for other pages)
+# PUBLIC HELPERS
 # ============================================================
 def watermark():
     st.markdown(

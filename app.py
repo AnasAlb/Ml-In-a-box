@@ -2,6 +2,7 @@
 ML in a Box — main driver.
 Run as: streamlit run app.py
 """
+import os
 import streamlit as st
 
 st.set_page_config(page_title="ML in a Box", page_icon="🤖",
@@ -18,7 +19,6 @@ from page_info import (render_tutorial, render_glossary, render_chat,
 
 # ============================================================ STATE
 def init_state():
-    # First: read URL params (highest priority)
     try:
         url_lang = st.query_params.get("lang")
         url_theme = st.query_params.get("theme")
@@ -40,7 +40,6 @@ def init_state():
 
 
 def sync_url():
-    """Mirror current state into URL query params so refresh preserves it."""
     try:
         if st.query_params.get("lang") != st.session_state.lang:
             st.query_params["lang"] = st.session_state.lang
@@ -52,32 +51,70 @@ def sync_url():
 
 init_state()
 
+# ---------------------------------------------------------- URL LOGOUT
 if st.query_params.get("logout") == "1":
-    auth.logout(); st.query_params.clear(); st.rerun()
+    auth.logout()
+    st.query_params.clear()
+    st.rerun()
 
 
+# ---------------------------------------------------------- RESET
 def reset_run():
-    for k in ("df", "source_path", "source_name", "load_notes", "target",
-              "task", "features", "mode", "model_keys", "proposed_plan",
-              "clean_plan", "warnings", "results", "extras", "notes",
-              "advice", "importance", "output_folder", "plan_approved",
-              "retried", "profile", "column_descriptions",
-              "modality", "learning_mode", "agent_target_suggestion",
-              "metric_preference", "interaction_proposals",
-              "interaction_specs", "_pdf_path", "prof_chat",
-              "manual_params", "_col_desc_cache", "enhancement_specs",
-              "_tune_result", "_agent_suggested_hp"):
+    """Clear all per-user data state. Keeps the user signed in."""
+    keys = (
+        # ---- ML pipeline
+        "df", "source_path", "source_name", "load_notes", "target",
+        "task", "features", "mode", "model_keys", "proposed_plan",
+        "clean_plan", "warnings", "results", "extras", "notes",
+        "advice", "importance", "output_folder", "plan_approved",
+        "retried", "profile", "column_descriptions",
+        "modality", "learning_mode", "agent_target_suggestion",
+        "metric_preference", "interaction_proposals",
+        "interaction_specs", "_pdf_path", "prof_chat",
+        "manual_params", "_col_desc_cache", "enhancement_specs",
+        "_tune_result", "_agent_suggested_hp", "use_smote",
+        "_show_enhance_ui",
+        # ---- Doc tools
+        "doc_pages", "doc_filenames", "doc_filename", "doc_chunks",
+        "doc_embedder", "doc_vectors", "doc_cleaned", "doc_clean_stats",
+        "doc_tokens", "doc_extractive", "doc_abstractive",
+        "doc_phrases", "doc_clusters", "doc_search_results",
+        "doc_rag_history", "doc_api_key", "_doc_clean_hash",
+        "_doc_last_sig", "doc_input", "doc_translation", "doc_grammar",
+        # ---- Loaded model (Profiler upload)
+        "_loaded_model", "_loaded_model_meta",
+        # ---- Computer Vision
+        "cv_task", "cv_extracted_root", "cv_workdir", "cv_class_names",
+        "cv_n_train", "cv_n_val", "cv_model", "cv_model_label",
+        "cv_model_classes", "cv_input_size", "cv_backbone_key",
+        "cv_custom_layers", "cv_model_saved", "cv_loaded_slot",
+        "cv_history", "cv_eval", "cv_layer_spec", "cv_upl_n", "cv_save_n",
+        "cv_confirm_del", "cv_flash",
+        # ---- YOLOv8 fine-tune
+        "_yolo_zip_sig", "_yolo_workdir", "_yolo_yaml", "_yolo_names",
+        "_yolo_weights",
+        # ---- Chat + Byte
+        "chat_history", "byte_chat", "_byte_modal", "_byte_tour_done",
+    )
+    for k in keys:
         st.session_state.pop(k, None)
     st.session_state.log = []
     st.session_state.retried = False
+    st.session_state.page = "home"
+    try:
+        del st.query_params["page"]
+    except Exception:
+        pass
 
 
 ui.inject()
 
+# ============================================================ LOGIN GATE
 if not auth.is_logged_in():
     auth.render_login()
     ui.render_byte("Hi! I'm Byte.")
-    ui.render_byte_chat("User is on the login screen.")
+    ui.render_byte_chat("User is on the login screen.",
+                         show_tour_if_new=False)
     ui.watermark()
     st.stop()
 
@@ -122,7 +159,6 @@ def inject_nav_css():
         text = "#A1A1AA"; text_hover = "#00F0FF"
         hover_bg = "rgba(0, 240, 255, 0.12)"
         active_text = "#00F0FF"; active_bg = "rgba(0, 240, 255, 0.15)"
-        logo_color = "#00F0FF"
     else:
         bg = "rgba(255, 255, 255, 0.88)"
         border = "rgba(212, 175, 55, 0.4)"
@@ -130,14 +166,16 @@ def inject_nav_css():
         text = "#6B7280"; text_hover = "#059669"
         hover_bg = "rgba(52, 211, 153, 0.12)"
         active_text = "#059669"; active_bg = "rgba(52, 211, 153, 0.18)"
-        logo_color = "#D4AF37"
 
     st.markdown(f"""
     <style>
         .st-key-nav_buttons {{
-            position: fixed !important; top: 20px !important;
-            left: 50% !important; transform: translateX(-50%) !important;
-            width: auto !important; min-width: 1080px !important;
+            position: fixed !important;
+            top: 20px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            width: auto !important;
+            min-width: 1000px !important;
             max-width: 98vw !important;
             background: {bg} !important;
             backdrop-filter: blur(20px) !important;
@@ -148,33 +186,44 @@ def inject_nav_css():
             z-index: 99999 !important;
             box-shadow: {shadow} !important;
         }}
-        .st-key-nav_buttons .stButton > button {{
-            background: transparent !important; border: none !important;
-            color: {text} !important; font-weight: 600 !important;
-            padding: 0.4rem 0.5rem !important;
-            box-shadow: none !important; font-size: 0.82rem !important;
-            border-radius: 20px !important; white-space: nowrap !important;
+        .st-key-nav_buttons button {{
+            background: transparent !important;
+            border: none !important;
+            color: {text} !important;
+            font-weight: 600 !important;
+            padding: 0.4rem 0.4rem !important;
+            box-shadow: none !important;
+            font-size: 0.8rem !important;
+            border-radius: 20px !important;
+            white-space: nowrap !important;
             transition: all 0.2s ease !important;
-            min-height: 0 !important; line-height: 1.2 !important;
+            min-height: 0 !important;
+            line-height: 1.2 !important;
             width: 100% !important;
         }}
-        .st-key-nav_buttons .stButton > button:hover {{
-            color: {text_hover} !important; background: {hover_bg} !important;
+        .st-key-nav_buttons button p,
+        .st-key-nav_buttons button div {{
+            color: inherit !important;
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            font-family: inherit !important;
+        }}
+        .st-key-nav_buttons button:hover {{
+            color: {text_hover} !important;
+            background: {hover_bg} !important;
             transform: none !important;
         }}
-        .st-key-nav_buttons .stButton > button:focus,
-        .st-key-nav_buttons .stButton > button:active {{
-            box-shadow: none !important; outline: none !important;
+        .st-key-nav_buttons button:focus,
+        .st-key-nav_buttons button:active {{
+            box-shadow: none !important;
+            outline: none !important;
         }}
         .st-key-nav_buttons [data-testid="stHorizontalBlock"] {{
-            gap: 0 !important; align-items: center !important;
+            gap: 0 !important;
+            align-items: center !important;
         }}
-        .st-key-nav_buttons [data-testid="column"] {{ padding: 0 !important; }}
-        .st-key-nav_buttons .nav-logo {{
-            color: {logo_color} !important; font-weight: 800 !important;
-            font-size: 0.98rem !important; padding-left: 0.6rem !important;
-            padding-right: 0.4rem !important;
-            line-height: 1.8 !important;
+        .st-key-nav_buttons [data-testid="column"] {{
+            padding: 0 !important;
         }}
     </style>
     """, unsafe_allow_html=True)
@@ -201,46 +250,53 @@ def inject_nav_css():
 def render_pill_nav():
     inject_nav_css()
     with st.container(key="nav_buttons"):
-        cols = st.columns(
-            [0.85, 0.35, 0.55, 1.15, 1.05, 0.85, 1.15, 1.0, 0.6,
-             0.45, 0.4, 0.4, 0.45])
+        # Removed logo -> now 13 columns
+        cols = st.columns([0.3, 0.6, 1.1, 1.0, 0.8, 1.1, 1.0, 0.6, 0.4, 0.4, 0.4, 0.7, 0.8])
 
         with cols[0]:
-            st.markdown('<div class="nav-logo">ML Box</div>',
-                        unsafe_allow_html=True)
-        with cols[1]:
-            if st.button("❓", key="nav_help", help=t("tutorial_btn"),
-                         use_container_width=True):
+            if st.button("?", key="nav_help", use_container_width=True):
                 st.session_state.page = "tutorial"; st.rerun()
+
         for i, (k, label_key) in enumerate(NAV_PAGES):
-            with cols[i + 2]:
+            with cols[i + 1]:
                 if st.button(t(label_key), key=f"nav_{k}",
                              use_container_width=True):
                     st.session_state.page = k; st.rerun()
-        with cols[9]:
+
+        with cols[8]:
             icon = "🌙" if st.session_state.theme == "light" else "☀️"
             if st.button(icon, key="nav_theme", use_container_width=True):
                 st.session_state.theme = (
                     "dark" if st.session_state.theme == "light" else "light")
                 sync_url()
                 st.rerun()
-        with cols[10]:
+
+        with cols[9]:
             if st.button("EN", key="nav_lang_en", use_container_width=True):
                 st.session_state.lang = "en"
                 sync_url()
                 st.rerun()
-        with cols[11]:
+
+        with cols[10]:
             if st.button("AR", key="nav_lang_ar", use_container_width=True):
                 st.session_state.lang = "ar"
                 sync_url()
                 st.rerun()
+
+        with cols[11]:
+            if st.button("Reset", key="nav_reset", use_container_width=True):
+                reset_run()
+                st.rerun()
+
         with cols[12]:
-            if st.button("⏻", key="nav_logout", use_container_width=True):
-                auth.logout(); reset_run(); st.rerun()
+            if st.button("Logout", key="nav_logout", use_container_width=True):
+                auth.logout()
+                reset_run()
+                st.rerun()
 
 
-render_pill_nav()
 sync_url()
+render_pill_nav()
 
 ui.render_byte(f"Hi {USER['display_name'].split()[0]}! I'm Byte.")
 
@@ -277,12 +333,16 @@ PAGE_RENDERERS = {
 
 current = st.session_state.page
 if not can_access(current):
-    st.session_state.page = "home"; current = "home"
+    st.session_state.page = "home"
+    current = "home"
 
 renderer = PAGE_RENDERERS.get(current, render_home)
 try:
     renderer()
 except Exception as e:
+    if type(e).__name__ in (
+            "RerunException", "StopException", "ScriptControlException"):
+        raise
     st.error(f"Page error: {type(e).__name__}: {e}")
     import traceback
     with st.expander("Traceback"):

@@ -57,6 +57,15 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
+try:
+    from imblearn.pipeline import Pipeline as ImbPipeline
+    from imblearn.over_sampling import SMOTE
+    IMBLEARN_AVAILABLE = True
+except ImportError:
+    IMBLEARN_AVAILABLE = False
+    ImbPipeline = Pipeline
+    SMOTE = None
+
 
 # ============================================================ 1. LOADER
 ENCODINGS = ("utf-8", "utf-8-sig", "latin-1")
@@ -658,8 +667,15 @@ def hyperparams(key, task):
     return []
 
 
-def make_with_params(key, task, params):
-    cat = catalog(task, 10000)
+def make_with_params(key, task, params, cat=None):
+    """Build a model with the given hyperparameters applied.
+
+    `cat` may be passed to reuse an already-built catalog (so that models
+    only available for the actual dataset size — e.g. SVM on small data —
+    are found). If omitted, a default catalog is built.
+    """
+    if cat is None:
+        cat = catalog(task, 10000)
     if key not in cat:
         return None
     m = cat[key]["make"]()
@@ -696,8 +712,15 @@ def make_with_params(key, task, params):
         if "C" in p: safe["C"] = float(p["C"])
         if "kernel" in p: safe["kernel"] = p["kernel"]
     elif key == "mlp":
-        if "alpha" in p: safe["alpha"] = float(p["alpha"])
-        if "learning_rate_init" in p: safe["learning_rate_init"] = float(p["learning_rate_init"])
+        # The UI exposes sklearn MLP names (`alpha`, `learning_rate_init`),
+        # but the torch variant uses different names. Map based on the
+        # actual model instance so the override is not silently ignored.
+        if TORCH_AVAILABLE and isinstance(m, TorchNN):
+            if "alpha" in p: safe["weight_decay"] = float(p["alpha"])
+            if "learning_rate_init" in p: safe["learning_rate"] = float(p["learning_rate_init"])
+        else:
+            if "alpha" in p: safe["alpha"] = float(p["alpha"])
+            if "learning_rate_init" in p: safe["learning_rate_init"] = float(p["learning_rate_init"])
     if safe:
         try:
             m.set_params(**safe)
@@ -984,19 +1007,41 @@ def _cv_splitter(task, y_tr, folds):
     return KFold(n_splits=folds, shuffle=True, random_state=42)
 
 
-def _fit_all(models, plan, X_tr, X_te, y_tr, y_te, task, use_nlp=False, scoring=None):
+def _fit_all(models, plan, X_tr, X_te, y_tr, y_te, task, use_nlp=False, scoring=None, use_smote=False):
     if use_nlp:
         from nlp import TextPipeline
     if scoring is None:
         scoring = "r2" if task == "regression" else "f1_macro"
     rows, preds, pipes, skipped = [], {}, {}, []
+
+    # Pre-compute a safe SMOTE k_neighbors from the train split so that
+    # CV folds (which see less than the full train set) still have enough
+    # minority-class samples for SMOTE. If the minority class is too small
+    # for any k_neighbors >= 1 we skip SMOTE rather than crash.
+    smote_k = None
+    if use_smote and task == "classification" and IMBLEARN_AVAILABLE:
+        try:
+            min_count = int(pd.Series(y_tr).value_counts().min())
+        except Exception:
+            min_count = 0
+        if min_count >= 2:
+            # Leave at least one spare sample per fold so SMOTE can pick
+            # a neighbour; use half the minority count as a conservative
+            # estimate of what each fold's train portion will hold.
+            smote_k = max(1, min(5, min_count // 2 - 1))
+
     for name, model in models.items():
         try:
             t0 = time.perf_counter()
-            pipe = (TextPipeline(model) if use_nlp
-                    else Pipeline([("fe", FeatureEngineer()),
-                                   ("prep", build_preprocessor(plan)),
-                                   ("model", model)]))
+            if use_nlp:
+                pipe = TextPipeline(model)
+            else:
+                steps = [("fe", FeatureEngineer()), ("prep", build_preprocessor(plan))]
+                if smote_k is not None:
+                    steps.append(("smote", SMOTE(random_state=42, k_neighbors=smote_k)))
+                steps.append(("model", model))
+                pipe = ImbPipeline(steps)
+
             folds = 3 if type(model).__name__ in ("MLPRegressor", "MLPClassifier",
                                                    "TorchNN", "SVC", "SVR") else 5
             splitter = _cv_splitter(task, y_tr, folds)
@@ -1005,7 +1050,7 @@ def _fit_all(models, plan, X_tr, X_te, y_tr, y_te, task, use_nlp=False, scoring=
             pred = pipe.predict(X_te)
             secs = round(time.perf_counter() - t0, 1)
         except Exception as e:
-            skipped.append(f"{name} ({type(e).__name__})"); continue
+            skipped.append(f"{name} ({type(e).__name__}: {e})"); continue
         preds[name], pipes[name] = pred, pipe
         if task == "regression":
             rows.append({"Model": name, "CV R2": round(cv, 3),
@@ -1107,7 +1152,7 @@ def apply_fixes(model, fixes):
 
 
 def _self_check(results, preds, pipes, selected, plan, task, X_tr, X_te, y_tr, y_te,
-                use_nlp=False, scoring=None):
+                use_nlp=False, scoring=None, use_smote=False):
     lines = []
     decision = agent_diagnose(results, task, y_tr, X_tr, pipes, use_nlp=use_nlp)
     findings = decision.get("findings", [])
@@ -1135,7 +1180,7 @@ def _self_check(results, preds, pipes, selected, plan, task, X_tr, X_te, y_tr, y
              for name, ch in changed.items()]
     lines.append("Agent tried: " + "; ".join(parts) + ".")
     res2, preds2, pipes2, _ = _fit_all(new_models, plan, X_tr, X_te, y_tr, y_te, task,
-                                        use_nlp=use_nlp, scoring=scoring)
+                                        use_nlp=use_nlp, scoring=scoring, use_smote=use_smote)
     if res2.empty:
         lines.append("Retry failed; original results kept.")
         return results, preds, pipes, lines
@@ -1143,7 +1188,12 @@ def _self_check(results, preds, pipes, selected, plan, task, X_tr, X_te, y_tr, y
     kept, rejected = [], []
     for _, row in res2.iterrows():
         name = row["Model"]
-        idx = results.index[results["Model"] == name][0]
+        idx_matches = results.index[results["Model"] == name]
+        if len(idx_matches) == 0:
+            # The retry produced a model that wasn't in the original run —
+            # can't merge; skip it (very rare, defensive only).
+            continue
+        idx = idx_matches[0]
         old, new = float(results.at[idx, cvcol]), float(row[cvcol])
         if new > old + 0.003:
             for col in results.columns:
@@ -1206,7 +1256,8 @@ def _score_from_preference(task, metric_preference):
 
 def run(df, target, plan, task=None, model_keys=None, self_check=True, nn_config=None,
         mode="all", metric_preference="balanced",
-        interaction_specs=None, source_name="", hyperparams_overrides=None):
+        interaction_specs=None, source_name="", hyperparams_overrides=None,
+        use_smote=False):
     notes = []
     df = df.copy()
     if plan.get("drop_duplicates"):
@@ -1248,6 +1299,11 @@ def run(df, target, plan, task=None, model_keys=None, self_check=True, nn_config
         if (~keep).sum() > 0:
             notes.append(f"Removed {int((~keep).sum())} rows with extreme target values")
             df = df[keep]
+
+    if len(df) < 5:
+        raise ValueError(
+            f"Dataset has only {len(df)} usable rows after cleaning. "
+            f"Need at least 5 to train and validate a model.")
 
     drop_missing = set(plan.get("drop_high_missing") or [])
     kept, dropped = select_features(df, target)
@@ -1335,14 +1391,13 @@ def run(df, target, plan, task=None, model_keys=None, self_check=True, nn_config
     for k in keys:
         name = cat[k]["name"]
         if k in overrides and overrides[k]:
-            m = make_with_params(k, task, overrides[k])
+            m = make_with_params(k, task, overrides[k], cat=cat)
             if m is None:
                 m = cat[k]["make"]()
         else:
             m = cat[k]["make"]()
         selected[name] = _maybe_balance(m, task, y_tr)
-        
-        # Capture hyperparameters for the results page
+
         hp_def = hyperparams(k, task)
         params = {}
         for p in hp_def:
@@ -1366,18 +1421,25 @@ def run(df, target, plan, task=None, model_keys=None, self_check=True, nn_config
     all_models = {base_name: base_model}
     all_models.update(selected)
 
-    results, preds, pipes, skipped = _fit_all(all_models, plan, X_tr, X_te, y_tr, y_te,
-                                                task, use_nlp=use_nlp, scoring=scoring)
+    results, preds, pipes, skipped = _fit_all(
+        all_models, plan, X_tr, X_te, y_tr, y_te, task,
+        use_nlp=use_nlp, scoring=scoring, use_smote=use_smote
+    )
     for s in skipped:
         notes.append("Skipped because of an error: " + s)
     if results.empty or len(results) < 2:
-        raise ValueError("No model could be trained on this data")
+        reason_hint = ""
+        if skipped:
+            reason_hint = " Errors: " + "; ".join(skipped[:3])
+        raise ValueError(
+            "No model could be trained on this data. The dataset may be too "
+            "small, too imbalanced, or have no usable signal." + reason_hint)
 
     selfcheck = []
     if self_check:
         results, preds, pipes, selfcheck = _self_check(
             results, preds, pipes, selected, plan, task, X_tr, X_te, y_tr, y_te,
-            use_nlp=use_nlp, scoring=scoring)
+            use_nlp=use_nlp, scoring=scoring, use_smote=use_smote)
 
     best_name = results.iloc[0]["Model"]
 
@@ -1453,7 +1515,7 @@ def run(df, target, plan, task=None, model_keys=None, self_check=True, nn_config
               "interactions": applied_interactions,
               "specific_reasons": specific_reasons,
               "model_keys": keys,
-              "applied_hyperparams": applied_hp} # Added here
+              "applied_hyperparams": applied_hp}
     return results, notes, extras
 
 
@@ -2361,15 +2423,16 @@ def sample_predictions(pipeline, X_test, y_test, n_correct=6, n_wrong=6):
     feat_cols = list(X_test.columns)[:4]
 
     for i in idx_order:
-        row = X_test.iloc[i]
-        pred = preds[i]; actual = y_arr[i]
+        pos = int(i)  # np.int64 is not accepted by iloc on all pandas versions
+        row = X_test.iloc[pos]
+        pred = preds[pos]; actual = y_arr[pos]
         is_correct = bool(pred == actual)
         snippet = " · ".join(f"{c}: {str(row[c])[:40]}" for c in feat_cols)
-        entry = {"row_index": int(i), "actual": str(actual),
+        entry = {"row_index": pos, "actual": str(actual),
                  "predicted": str(pred), "snippet": snippet}
         if hasattr(pipeline, "predict_proba"):
             try:
-                proba = pipeline.predict_proba(X_test.iloc[[i]])[0]
+                proba = pipeline.predict_proba(X_test.iloc[[pos]])[0]
                 entry["confidence"] = round(float(proba.max()), 3)
             except Exception:
                 pass

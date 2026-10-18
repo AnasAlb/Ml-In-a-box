@@ -4,12 +4,9 @@ Computer Vision page.
 Classification: full pipeline — upload a ZIP, pick a backbone (or build a
 custom CNN), train, evaluate, predict.
 
-Saved models are PERSISTENT: each user can keep up to MAX_SAVED trained
-models on disk (outputs/_cv_saved_models). They survive Streamlit restarts
-and can be loaded or deleted at any time — even before uploading a dataset.
+Detection: Zero-shot YOLOv8 inference. Upload an image to see bounding boxes.
 
-Detection and segmentation: LOCKED (Work in Progress). The training loop
-is not built. Those tabs show a roadmap only.
+Segmentation: LOCKED (Work in Progress).
 """
 import os
 import copy
@@ -30,7 +27,8 @@ from cv import (torch_status, CLASSIFICATION_BACKBONES, DETECTION_BACKBONES,
                  build_dataloaders, build_classifier, count_trainable,
                  count_total, train_classifier, evaluate, denormalize,
                  predict_single_image, list_saved_models, save_model_slot,
-                 load_model_slot, delete_model_slot, recommend_backbone)
+                 load_model_slot, delete_model_slot, recommend_backbone,
+                 predict_yolov8)
 
 
 MAX_SAVED = 3   # per user
@@ -495,16 +493,31 @@ def _render_predict():
     if st.session_state.get("cv_loaded_slot"):
         caption += t("cv_predict_loaded")
     st.caption(caption)
-    up = st.file_uploader("Upload a single image",
-                          type=["png", "jpg", "jpeg", "webp", "bmp"],
-                          key="cv_single")
-    if up is None:
+    
+    # WEB CAM SUPPORT
+    input_mode = st.radio("Input Method", ["📤 Upload Image", "📸 Live Webcam"], horizontal=True)
+    
+    pil = None
+    if input_mode == "📤 Upload Image":
+        up = st.file_uploader("Upload a single image",
+                              type=["png", "jpg", "jpeg", "webp", "bmp"],
+                              key="cv_single")
+        if up:
+            try:
+                pil = Image.open(up).convert("RGB")
+            except Exception as e:
+                st.error(f"Could not open image: {type(e).__name__}: {e}")
+    else:
+        camera_img = st.camera_input("Take a picture")
+        if camera_img:
+            try:
+                pil = Image.open(camera_img).convert("RGB")
+            except Exception as e:
+                st.error(f"Could not open camera image: {type(e).__name__}: {e}")
+
+    if pil is None:
         return
-    try:
-        pil = Image.open(up).convert("RGB")
-    except Exception as e:
-        st.error(f"Could not open image: {type(e).__name__}: {e}")
-        return
+
     c1, c2 = st.columns([1, 2])
     with c1:
         st.image(pil, use_container_width=True)
@@ -655,28 +668,33 @@ def _render_saved_models():
                 st.rerun()
 
 
-# ============================================================ DETECTION (LOCKED)
+# ============================================================ DETECTION (YOLOV8)
 def _detection_tab():
-    st.markdown(
-        f'<div class="card" style="border-left:3px solid #fbbf24;'
-        f'background:linear-gradient(180deg,rgba(251,191,36,0.08),'
-        f'rgba(251,191,36,0.02));">'
-        f'<h4 style="color:#fcd34d;">{t("cv_detect_wip_title")}</h4>'
-        f'<p>{t("cv_detect_wip_body")}</p>'
-        f'<p>{t("cv_detect_wip_body2")}</p>'
-        f'<p style="color:#94a3b8;font-size:0.85rem;margin-top:0.6rem;">'
-        f'{t("cv_detect_wip_foot")}</p>'
-        f'</div>', unsafe_allow_html=True)
-
-    st.markdown(t("cv_detect_arch_title"))
-    for key, info in DETECTION_BACKBONES.items():
-        st.markdown(
-            f'<div class="card" style="opacity:0.55;">'
-            f'<h4>🔒 {esc(info["name"])}</h4>'
-            f'<p>{esc(info["blurb"])}</p></div>',
-            unsafe_allow_html=True)
-
-    st.info(t("cv_detect_locked"))
+    st.markdown("### 🎯 Zero-Shot Object Detection (YOLOv8)")
+    st.caption("This tab uses a pre-trained YOLOv8 model to detect common objects (people, cars, animals) in your uploaded images. It requires no training.")
+    
+    up = st.file_uploader("Upload an image for detection", type=["png", "jpg", "jpeg", "webp"])
+    if up is not None:
+        try:
+            pil = Image.open(up).convert("RGB")
+            with st.spinner("Running YOLOv8 inference..."):
+                annotated_img, df = predict_yolov8(pil)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.image(pil, caption="Original", use_container_width=True)
+                with c2:
+                    st.image(annotated_img, caption="YOLOv8 Detections", use_container_width=True)
+                    
+                if not df.empty:
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.info("No objects detected in this image.")
+                    
+        except ImportError as e:
+            st.error(f"Missing dependency: {e}")
+        except Exception as e:
+            st.error(f"Detection failed: {type(e).__name__}: {e}")
 
 
 # ============================================================ SEGMENTATION (LOCKED)
@@ -708,19 +726,11 @@ def render_cv():
     _init_state()
 
     if not auth.is_logged_in():
-        ui.hero("Sign in required",
-                "The CV page needs an authenticated session.",
-                pills=["restart required"])
+        st.error("Sign in required. The CV page needs an authenticated session.")
         return
     if not auth.can_use("cv"):
         st.error("Your account does not have access to Computer Vision.")
         return
-
-    ui.hero(
-        t("cv_hero_title"),
-        t("cv_hero_sub"),
-        pills=[t("cv_pill_1"), t("cv_pill_2"), t("cv_pill_3"), t("cv_pill_4")],
-    )
 
     tab1, tab2, tab3 = st.tabs([t("cv_tab_class"), t("cv_tab_detect"),
                                  t("cv_tab_seg")])
