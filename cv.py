@@ -806,7 +806,6 @@ def prepare_yolo_dataset(zip_bytes, dest):
     val_dir = None
     
     for dirpath, dirnames, filenames in os.walk(dest):
-        # A folder is a potential split if it contains image files
         img_count = sum(1 for f in filenames if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")))
         if img_count > 0:
             d_lower = dirpath.lower()
@@ -816,7 +815,6 @@ def prepare_yolo_dataset(zip_bytes, dest):
                 val_dir = dirpath
 
     if not train_dir:
-        # Fallback: maybe there's no "train" in the path, just images?
         for dirpath, dirnames, filenames in os.walk(dest):
             img_count = sum(1 for f in filenames if f.lower().endswith((".jpg", ".jpeg", ".png")))
             if img_count > 0:
@@ -829,15 +827,13 @@ def prepare_yolo_dataset(zip_bytes, dest):
             "Make sure you upload a valid YOLO dataset (.zip) with images."
         )
 
-    # Determine root and relative paths
     if "images" in train_dir.lower():
         root_dir = os.path.dirname(train_dir)
-        rel_train = os.path.basename(train_dir) # "images"
+        rel_train = os.path.basename(train_dir)
     else:
         root_dir = os.path.dirname(train_dir)
-        rel_train = os.path.basename(train_dir) # "train"
+        rel_train = os.path.basename(train_dir)
 
-    # If the parent's parent contains 'images' or 'train', go up one more
     if os.path.basename(root_dir).lower() in ("images", "train", "valid", "val"):
          root_dir = os.path.dirname(root_dir)
          rel_train = os.path.relpath(train_dir, root_dir).replace("\\", "/")
@@ -925,13 +921,25 @@ def train_yolov8(data_yaml, base_model="yolov8n.pt", epochs=50,
         workers=workers,
     )
 
-    best = os.path.join(project_dir, run_name, "weights", "best.pt")
-    if not os.path.isfile(best):
-        last = os.path.join(project_dir, run_name, "weights", "last.pt")
+    # The most reliable way to get the weights path from Ultralytics
+    if hasattr(model, "trainer"):
+        best = str(model.trainer.best)
+        if os.path.isfile(best):
+            return best, None
+        last = str(model.trainer.last)
         if os.path.isfile(last):
-            best = last
-    if not os.path.isfile(best):
-        raise FileNotFoundError(
-            f"Training finished but no weights found at "
-            f"{project_dir}/{run_name}/weights/.")
-    return best, None
+            return last, None
+
+    # Fallback: scan the directory tree just in case
+    import glob
+    best_files = glob.glob(os.path.join(project_dir, "**", "best.pt"), recursive=True)
+    if best_files:
+        return best_files[0], None
+    last_files = glob.glob(os.path.join(project_dir, "**", "last.pt"), recursive=True)
+    if last_files:
+        return last_files[0], None
+
+    raise FileNotFoundError(
+        f"Training finished but no weights found in {project_dir}. "
+        "Check the logs for details."
+    )
