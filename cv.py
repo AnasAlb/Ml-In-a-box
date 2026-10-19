@@ -760,46 +760,20 @@ def predict_yolov8(pil_image, weights_path=None, conf=0.25):
 
 
 # ============================================================ 9. YOLOV8 FINE-TUNING
-def _walk_dirs(root, max_depth=4):
-    root = os.path.abspath(root)
-    for dirpath, dirnames, _ in os.walk(root):
-        rel = os.path.relpath(dirpath, root)
-        depth = 0 if rel == "." else rel.count(os.sep) + 1
-        if depth > max_depth:
-            dirnames[:] = []
-            continue
-        yield dirpath
-
-
-def _find_yolo_root(root):
-    for d in _walk_dirs(root):
-        if (os.path.isdir(os.path.join(d, "images", "train"))
-                and os.path.isdir(os.path.join(d, "labels", "train"))):
-            return d
-        if (os.path.isdir(os.path.join(d, "images"))
-                and os.path.isdir(os.path.join(d, "labels"))):
-            return d
-    return None
-
-
-def _infer_class_names(labels_dir):
+def _infer_class_names(root_dir):
+    """Scan the whole extracted folder for .txt files to find class IDs."""
     classes = set()
-    if os.path.isdir(labels_dir):
-        for fn in os.listdir(labels_dir):
-            if not fn.lower().endswith(".txt"):
-                continue
-            try:
-                with open(os.path.join(labels_dir, fn),
-                          "r", encoding="utf-8") as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if parts:
-                            try:
+    for dirpath, _, filenames in os.walk(root_dir):
+        for fn in filenames:
+            if fn.lower().endswith(".txt"):
+                try:
+                    with open(os.path.join(dirpath, fn), "r", encoding="utf-8") as f:
+                        for line in f:
+                            parts = line.strip().split()
+                            if parts:
                                 classes.add(int(float(parts[0])))
-                            except ValueError:
-                                pass
-            except Exception:
-                continue
+                except Exception:
+                    pass
     if not classes:
         classes = {0}
     return {i: f"class_{i}" for i in sorted(classes)}
@@ -810,26 +784,79 @@ def prepare_yolo_dataset(zip_bytes, dest):
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
         z.extractall(dest)
 
-    root = _find_yolo_root(dest)
-    if root is None:
+    # 1. Use existing data.yaml if present
+    for dirpath, _, filenames in os.walk(dest):
+        if "data.yaml" in filenames:
+            yaml_path = os.path.join(dirpath, "data.yaml")
+            try:
+                import yaml
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                
+                # Force absolute path to the directory containing data.yaml
+                data["path"] = os.path.abspath(dirpath)
+                with open(yaml_path, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(data, f, sort_keys=False)
+                return yaml_path, data.get("names", {})
+            except Exception:
+                pass
+
+    # 2. Build one by scanning if no yaml
+    train_dir = None
+    val_dir = None
+    
+    for dirpath, dirnames, filenames in os.walk(dest):
+        # A folder is a potential split if it contains image files
+        img_count = sum(1 for f in filenames if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")))
+        if img_count > 0:
+            d_lower = dirpath.lower()
+            if "train" in d_lower:
+                train_dir = dirpath
+            elif "val" in d_lower or "valid" in d_lower:
+                val_dir = dirpath
+
+    if not train_dir:
+        # Fallback: maybe there's no "train" in the path, just images?
+        for dirpath, dirnames, filenames in os.walk(dest):
+            img_count = sum(1 for f in filenames if f.lower().endswith((".jpg", ".jpeg", ".png")))
+            if img_count > 0:
+                train_dir = dirpath
+                break
+
+    if not train_dir:
         raise ValueError(
-            "Could not find a YOLO dataset inside the zip. Expected "
-            "`images/train/` + `labels/train/` (or `images/` + `labels/`). "
-            "See https://docs.ultralytics.com/datasets/detect/ for the format.")
+            "Could not find any images inside the ZIP file. "
+            "Make sure you upload a valid YOLO dataset (.zip) with images."
+        )
 
-    has_val = os.path.isdir(os.path.join(root, "images", "val"))
-    val_rel = "images/val" if has_val else "images/train"
+    # Determine root and relative paths
+    if "images" in train_dir.lower():
+        root_dir = os.path.dirname(train_dir)
+        rel_train = os.path.basename(train_dir) # "images"
+    else:
+        root_dir = os.path.dirname(train_dir)
+        rel_train = os.path.basename(train_dir) # "train"
 
-    names = _infer_class_names(os.path.join(root, "labels", "train"))
+    # If the parent's parent contains 'images' or 'train', go up one more
+    if os.path.basename(root_dir).lower() in ("images", "train", "valid", "val"):
+         root_dir = os.path.dirname(root_dir)
+         rel_train = os.path.relpath(train_dir, root_dir).replace("\\", "/")
+    
+    if not val_dir:
+        rel_val = rel_train
+    else:
+        rel_val = os.path.relpath(val_dir, root_dir).replace("\\", "/")
+
+    names = _infer_class_names(root_dir)
 
     data = {
-        "path": os.path.abspath(root),
-        "train": "images/train",
-        "val": val_rel,
+        "path": os.path.abspath(root_dir),
+        "train": rel_train,
+        "val": rel_val,
         "names": names,
     }
-
-    yaml_path = os.path.join(root, "data.yaml")
+    
+    yaml_path = os.path.join(root_dir, "data.yaml")
     try:
         import yaml
         with open(yaml_path, "w", encoding="utf-8") as f:

@@ -766,7 +766,7 @@ def _detection_finetune():
                 f"{YOLO_BACKBONES[k]['params']} · {YOLO_BACKBONES[k]['speed']}"),
             key="det_ft_base")
     with c2:
-        epochs = st.slider("Epochs", 5, 200, 50, 5, key="det_ft_epochs")
+        epochs = st.slider("Epochs", 5, 200, 10, 5, key="det_ft_epochs")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -777,10 +777,11 @@ def _detection_finetune():
     with c2:
         batch = st.slider("Batch size", 4, 64, 16, 4, key="det_ft_batch")
 
-    st.caption(
-        "💡 Training is much slower than classification. If it crashes "
-        "with CUDA out-of-memory, reduce batch size. Progress is also "
-        "printed in the terminal (VS Code).")
+    st.warning(
+        "⚠️ **CPU Training Warning:** YOLOv8 training on Streamlit Cloud (CPU only) is very slow. "
+        "Start with a small number of epochs (5-10) to make sure it works. "
+        "If it crashes with out-of-memory, reduce the batch size."
+    )
 
     st.markdown("**Step 3 — Train**")
     if st.button("🚀 Fine-tune YOLOv8", type="primary", key="det_ft_train_btn"):
