@@ -124,8 +124,6 @@ SEGMENTATION_BACKBONES = {
                   "blurb": "Promptable Segment-Anything. Zero-shot, needs prompts."},
 }
 
-# YOLOv8 model sizes. `weights` is the file ultralytics will download on first
-# use; it doubles as the starting point when fine-tuning.
 YOLO_BACKBONES = {
     "yolov8n": {"name": "YOLOv8 Nano",     "params": "3.2M",  "speed": "Fastest",  "weights": "yolov8n.pt"},
     "yolov8s": {"name": "YOLOv8 Small",    "params": "11.2M", "speed": "Fast",     "weights": "yolov8s.pt"},
@@ -136,7 +134,6 @@ YOLO_BACKBONES = {
 
 
 def default_layer_spec():
-    """Reasonable starter stack for the custom CNN builder."""
     return [
         {"type": "conv2d",  "out_channels": 32, "kernel": 3},
         {"type": "maxpool", "kernel": 2},
@@ -152,8 +149,6 @@ _IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
 
 
 class _ImageFolderDataset(Dataset):
-    """Flat directory-of-classes dataset. Paths are resolved at __init__."""
-
     def __init__(self, root, classes, transform):
         self.transform = transform
         self.samples = []
@@ -170,7 +165,6 @@ class _ImageFolderDataset(Dataset):
 
     def __getitem__(self, i):
         path, label = self.samples[i]
-        # `with` so the handle is released on Windows before rmtree runs.
         with Image.open(path) as im:
             img = im.convert("RGB")
         if self.transform:
@@ -179,8 +173,6 @@ class _ImageFolderDataset(Dataset):
 
 
 def extract_zip_to_folder(zip_bytes, dest):
-    """Extract a dataset zip and return the folder that holds one
-    subdirectory per class. Returns None if no such folder is found."""
     os.makedirs(dest, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
         z.extractall(dest)
@@ -217,7 +209,6 @@ def _build_transforms(input_size):
 
 
 def recommend_backbone(n_train, n_classes):
-    """Pick a classification backbone from dataset size — no LLM required."""
     if n_train < 80:
         key = "mobilenet"
         reason = (f"{n_train} training images is small, so MobileNet-V3 is less "
@@ -276,7 +267,6 @@ def build_dataloaders(root, batch_size=16, input_size=224, val_split=0.2):
 
 # ============================================================ 4. MODELS
 def _build_custom_cnn(layers, n_classes):
-    """Build a small CNN from the layer spec."""
     modules = []
     c_in = 3
     in_dense = False
@@ -317,7 +307,6 @@ def _build_custom_cnn(layers, n_classes):
 
 def build_classifier(backbone_key, n_classes, freeze_backbone=True,
                      custom_layers=None):
-    """Return (model, input_size, human_label)."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
 
@@ -379,7 +368,6 @@ def _class_weights(loader, n_classes, device):
 
 def train_classifier(model, tr_loader, va_loader, device,
                      epochs=5, lr=1e-3, progress_cb=None, patience=4):
-    """Train and return a history dict."""
     model.to(device)
     params = [p for p in model.parameters() if p.requires_grad]
     if not params:
@@ -464,7 +452,6 @@ def _evaluate_loss_acc(model, loader, device, loss_fn):
 
 @torch.no_grad()
 def evaluate(model, loader, device, class_names):
-    """Return (accuracy, confusion_df, per_class_df, samples)."""
     model.eval()
     all_true, all_pred = [], []
     samples = []
@@ -523,14 +510,12 @@ _STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def denormalize(tensor):
-    """CHW tensor -> HWC float image in [0, 1] for st.image."""
     img = tensor.cpu().numpy().transpose(1, 2, 0)
     img = img * _STD + _MEAN
     return np.clip(img, 0.0, 1.0)
 
 
 def predict_single_image(model, pil_image, class_names, device, input_size=224):
-    """Return (label, confidence, {class_name: prob})."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
 
@@ -563,7 +548,6 @@ def _slug(text):
 
 
 def list_saved_models(owner=None):
-    """Return metadata for every saved slot on disk, newest first."""
     if not os.path.isdir(CV_SAVE_DIR):
         return []
     slots = []
@@ -588,7 +572,6 @@ def list_saved_models(owner=None):
 
 def save_model_slot(model, label, backbone_key, custom_layers, class_names,
                     input_size, accuracy, n_classes, owner=""):
-    """Persist one trained model to disk. Returns its metadata dict."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
     os.makedirs(CV_SAVE_DIR, exist_ok=True)
@@ -627,7 +610,6 @@ def save_model_slot(model, label, backbone_key, custom_layers, class_names,
 
 
 def load_model_slot(slot_id):
-    """Rebuild a saved model on the current device. Returns (model, meta)."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
 
@@ -657,7 +639,6 @@ def load_model_slot(slot_id):
 
 
 def delete_model_slot(slot_id):
-    """Remove both .pt and .json for the given slot. Silent if missing."""
     removed = []
     for ext in (".pt", ".json"):
         p = os.path.join(CV_SAVE_DIR, f"{slot_id}{ext}")
@@ -672,7 +653,6 @@ def delete_model_slot(slot_id):
 
 # ============================================================ 8. PRETRAINED DETECT / SEGMENT
 def predict_detection(pil_image, score_thresh=0.5):
-    """Zero-shot COCO Faster R-CNN on one image. Returns (annotated PIL, rows)."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
     from torchvision.models.detection import (
@@ -707,7 +687,6 @@ def predict_detection(pil_image, score_thresh=0.5):
 
 
 def predict_segmentation(pil_image):
-    """Zero-shot DeepLabV3 (VOC/COCO classes) on one image. Returns (overlay, legend)."""
     if not TORCH:
         raise RuntimeError("PyTorch is not installed.")
     from torchvision.models.segmentation import (
@@ -742,12 +721,6 @@ def predict_segmentation(pil_image):
 
 
 def predict_yolov8(pil_image, weights_path=None, conf=0.25):
-    """YOLOv8 inference.
-
-    weights_path: optional path to a trained .pt file. If None, uses the
-    pre-trained COCO nano model (`yolov8n.pt`) for zero-shot detection.
-    Returns (annotated PIL, pd.DataFrame of boxes).
-    """
     if not TORCH:
         raise RuntimeError("PyTorch is not installed. YOLOv8 requires it.")
     try:
@@ -788,7 +761,6 @@ def predict_yolov8(pil_image, weights_path=None, conf=0.25):
 
 # ============================================================ 9. YOLOV8 FINE-TUNING
 def _walk_dirs(root, max_depth=4):
-    """Yield directories up to max_depth below root (inclusive)."""
     root = os.path.abspath(root)
     for dirpath, dirnames, _ in os.walk(root):
         rel = os.path.relpath(dirpath, root)
@@ -800,12 +772,10 @@ def _walk_dirs(root, max_depth=4):
 
 
 def _find_yolo_root(root):
-    """Find the first dir that looks like a YOLO dataset root."""
     for d in _walk_dirs(root):
         if (os.path.isdir(os.path.join(d, "images", "train"))
                 and os.path.isdir(os.path.join(d, "labels", "train"))):
             return d
-        # Allow the un-split layout: images/ + labels/ side by side
         if (os.path.isdir(os.path.join(d, "images"))
                 and os.path.isdir(os.path.join(d, "labels"))):
             return d
@@ -813,7 +783,6 @@ def _find_yolo_root(root):
 
 
 def _infer_class_names(labels_dir):
-    """Scan .txt labels and collect class IDs → {id: 'class_id'}."""
     classes = set()
     if os.path.isdir(labels_dir):
         for fn in os.listdir(labels_dir):
@@ -837,11 +806,6 @@ def _infer_class_names(labels_dir):
 
 
 def prepare_yolo_dataset(zip_bytes, dest):
-    """Extract a YOLO-format dataset zip and write `data.yaml`.
-
-    Returns (yaml_path, names_dict). Raises ValueError if the zip does not
-    contain `images/train/` + `labels/train/` (or `images/` + `labels/`).
-    """
     os.makedirs(dest, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
         z.extractall(dest)
@@ -871,7 +835,6 @@ def prepare_yolo_dataset(zip_bytes, dest):
         with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, sort_keys=False)
     except ImportError:
-        # Fallback: hand-write a minimal valid YAML.
         with open(yaml_path, "w", encoding="utf-8") as f:
             f.write(f"path: {data['path']}\n")
             f.write(f"train: {data['train']}\n")
@@ -886,13 +849,6 @@ def prepare_yolo_dataset(zip_bytes, dest):
 def train_yolov8(data_yaml, base_model="yolov8n.pt", epochs=50,
                  imgsz=640, batch=16, project_dir="outputs",
                  run_name=None, workers=0, progress_cb=None):
-    """Fine-tune a YOLOv8 model on a YOLO-format dataset.
-
-    Returns (best_weights_path, results_or_None).
-
-    `progress_cb` is called with kwargs `epoch`, `epochs`, `metrics`
-    after every training epoch.
-    """
     if not TORCH:
         raise RuntimeError("PyTorch is not installed. YOLOv8 requires it.")
     try:

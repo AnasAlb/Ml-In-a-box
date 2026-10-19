@@ -4,7 +4,9 @@ Computer Vision page.
 Classification: full pipeline — upload a ZIP, pick a backbone (or build a
 custom CNN), train, evaluate, predict.
 
-Detection: Zero-shot YOLOv8 inference. Upload an image to see bounding boxes.
+Detection: YOLOv8. Two modes:
+  - Zero-shot: pre-trained COCO weights, no training required.
+  - Fine-tune: train on your own YOLO-format dataset (images/ + labels/).
 
 Segmentation: LOCKED (Work in Progress).
 """
@@ -23,12 +25,13 @@ import ui
 import auth
 from i18n import t
 from cv import (torch_status, CLASSIFICATION_BACKBONES, DETECTION_BACKBONES,
-                 SEGMENTATION_BACKBONES, default_layer_spec, extract_zip_to_folder,
+                 SEGMENTATION_BACKBONES, YOLO_BACKBONES,
+                 default_layer_spec, extract_zip_to_folder,
                  build_dataloaders, build_classifier, count_trainable,
                  count_total, train_classifier, evaluate, denormalize,
                  predict_single_image, list_saved_models, save_model_slot,
                  load_model_slot, delete_model_slot, recommend_backbone,
-                 predict_yolov8)
+                 predict_yolov8, prepare_yolo_dataset, train_yolov8)
 
 
 MAX_SAVED = 3   # per user
@@ -74,7 +77,6 @@ def _username():
 
 
 def _clean_layers(spec):
-    """Copy of the layer list without UI-only keys (those starting with _)."""
     return [{k: v for k, v in layer.items() if not k.startswith("_")}
             for layer in (spec or [])]
 
@@ -238,7 +240,6 @@ def _train_flow():
 
 
 def _layer_builder():
-    """UI to build the custom CNN layer list. Returns the cleaned list."""
     if not st.session_state.get("cv_layer_spec"):
         st.session_state["cv_layer_spec"] = default_layer_spec()
     spec = st.session_state["cv_layer_spec"]
@@ -342,7 +343,6 @@ def _run_training(backbone_key, custom_layers, epochs, lr, bs, freeze, root):
     st.info(f"{label} · {total:,} parameters, {trainable:,} trainable "
             f"(backbone {'frozen' if freeze and backbone_key != 'custom' else 'active'})")
 
-    # ---- Live training UI
     progress = st.progress(0, text=t("cv_training"))
     log_box = st.empty()
     chart_slot = st.empty()
@@ -493,10 +493,10 @@ def _render_predict():
     if st.session_state.get("cv_loaded_slot"):
         caption += t("cv_predict_loaded")
     st.caption(caption)
-    
-    # WEB CAM SUPPORT
-    input_mode = st.radio("Input Method", ["📤 Upload Image", "📸 Live Webcam"], horizontal=True)
-    
+
+    input_mode = st.radio("Input Method",
+                          ["📤 Upload Image", "📸 Live Webcam"], horizontal=True)
+
     pil = None
     if input_mode == "📤 Upload Image":
         up = st.file_uploader("Upload a single image",
@@ -670,31 +670,186 @@ def _render_saved_models():
 
 # ============================================================ DETECTION (YOLOV8)
 def _detection_tab():
-    st.markdown("### 🎯 Zero-Shot Object Detection (YOLOv8)")
-    st.caption("This tab uses a pre-trained YOLOv8 model to detect common objects (people, cars, animals) in your uploaded images. It requires no training.")
+    st.markdown("### 🎯 Object Detection (YOLOv8)")
     
-    up = st.file_uploader("Upload an image for detection", type=["png", "jpg", "jpeg", "webp"])
+    tab_zs, tab_ft = st.tabs(["⚡ Zero-Shot Detection", "🎓 Fine-Tune on Custom Dataset"])
+    
+    with tab_zs:
+        _detection_zero_shot()
+    with tab_ft:
+        _detection_finetune()
+
+
+def _detection_zero_shot():
+    st.caption(
+        "Zero-shot mode uses pre-trained COCO weights (80 common classes). "
+        "No training required."
+    )
+    up = st.file_uploader(
+        "Upload an image for detection",
+        type=["png", "jpg", "jpeg", "webp"], key="det_zs_img")
+    if up is None:
+        return
+    try:
+        pil = Image.open(up).convert("RGB")
+    except Exception as e:
+        st.error(f"Could not open image: {type(e).__name__}: {e}")
+        return
+
+    try:
+        with st.spinner("Running YOLOv8 inference..."):
+            annotated_img, df = predict_yolov8(pil)
+    except ImportError as e:
+        st.error(f"Missing dependency: {e}")
+        return
+    except Exception as e:
+        st.error(f"Detection failed: {type(e).__name__}: {e}")
+        return
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(pil, caption="Original", use_container_width=True)
+    with c2:
+        st.image(annotated_img, caption="YOLOv8 detections", use_container_width=True)
+
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("No objects detected in this image.")
+
+
+def _detection_finetune():
+    ss = st.session_state
+
+    st.markdown("**Step 1 — Upload a YOLO-format dataset (.zip)**")
+    st.caption(
+        "Expect `images/train/`, `images/val/`, `labels/train/`, "
+        "`labels/val/` inside the zip. Missing `val/` falls back to train. "
+        "Labels must be YOLO `.txt` (class cx cy w h). See "
+        "https://docs.ultralytics.com/datasets/detect/ for the exact format.")
+
+    up = st.file_uploader(
+        "YOLO dataset (.zip)", type=["zip"], key="det_ft_zip")
+
     if up is not None:
+        sig = (up.name, getattr(up, "size", 0))
+        if ss.get("_yolo_zip_sig") != sig:
+            workdir = os.path.join("outputs", f"yolo_ds_{uuid.uuid4().hex[:6]}")
+            try:
+                with st.spinner("Extracting and inspecting dataset..."):
+                    yaml_path, names = prepare_yolo_dataset(up.getvalue(), workdir)
+            except Exception as e:
+                shutil.rmtree(workdir, ignore_errors=True)
+                st.error(f"Could not prepare dataset: {type(e).__name__}: {e}")
+                return
+            ss["_yolo_zip_sig"] = sig
+            ss["_yolo_workdir"] = workdir
+            ss["_yolo_yaml"] = yaml_path
+            ss["_yolo_names"] = names
+            ss["_yolo_weights"] = None
+            st.success(
+                f"Dataset ready · {len(names)} classes: "
+                f"{', '.join(names.values())}")
+
+    yaml_path = ss.get("_yolo_yaml")
+    if not yaml_path:
+        return
+
+    st.markdown("**Step 2 — Training configuration**")
+    c1, c2 = st.columns(2)
+    with c1:
+        base = st.selectbox(
+            "Base model",
+            list(YOLO_BACKBONES.keys()),
+            format_func=lambda k: (
+                f"{YOLO_BACKBONES[k]['name']} — "
+                f"{YOLO_BACKBONES[k]['params']} · {YOLO_BACKBONES[k]['speed']}"),
+            key="det_ft_base")
+    with c2:
+        epochs = st.slider("Epochs", 5, 200, 50, 5, key="det_ft_epochs")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        imgsz = st.select_slider(
+            "Image size",
+            options=[320, 416, 512, 640, 768], value=640,
+            key="det_ft_imgsz")
+    with c2:
+        batch = st.slider("Batch size", 4, 64, 16, 4, key="det_ft_batch")
+
+    st.caption(
+        "💡 Training is much slower than classification. If it crashes "
+        "with CUDA out-of-memory, reduce batch size. Progress is also "
+        "printed in the terminal (VS Code).")
+
+    st.markdown("**Step 3 — Train**")
+    if st.button("🚀 Fine-tune YOLOv8", type="primary", key="det_ft_train_btn"):
+        run_name = f"yolo_run_{uuid.uuid4().hex[:6]}"
+        project_dir = os.path.join("outputs", "yolo_runs")
+
+        status = st.status("Training YOLOv8...", expanded=True)
+        progress = st.progress(0, text="Starting...")
+        epoch_log = st.empty()
+
+        def _cb(epoch, epochs, metrics):
+            frac = min(1.0, epoch / max(epochs, 1))
+            progress.progress(frac, text=f"Epoch {epoch}/{epochs}")
+            try:
+                epoch_log.caption(f"Epoch {epoch}/{epochs} — {metrics}")
+            except Exception:
+                pass
+
         try:
-            pil = Image.open(up).convert("RGB")
-            with st.spinner("Running YOLOv8 inference..."):
-                annotated_img, df = predict_yolov8(pil)
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.image(pil, caption="Original", use_container_width=True)
-                with c2:
-                    st.image(annotated_img, caption="YOLOv8 Detections", use_container_width=True)
-                    
-                if not df.empty:
-                    st.dataframe(df, use_container_width=True)
-                else:
-                    st.info("No objects detected in this image.")
-                    
-        except ImportError as e:
-            st.error(f"Missing dependency: {e}")
+            best_weights, _ = train_yolov8(
+                data_yaml=yaml_path,
+                base_model=YOLO_BACKBONES[base]["weights"],
+                epochs=int(epochs),
+                imgsz=int(imgsz),
+                batch=int(batch),
+                project_dir=project_dir,
+                run_name=run_name,
+                workers=0,          # safest on Windows
+                progress_cb=_cb,
+            )
+            status.update(label="Training complete ✅", state="complete")
+            ss["_yolo_weights"] = best_weights
+            st.success(f"Model trained → {best_weights}")
         except Exception as e:
-            st.error(f"Detection failed: {type(e).__name__}: {e}")
+            status.update(label="Training failed ❌", state="error")
+            st.error(f"Training failed: {type(e).__name__}: {e}")
+            return
+
+    weights = ss.get("_yolo_weights")
+    if not weights:
+        return
+    st.markdown("**Step 4 — Test the fine-tuned model**")
+    st.caption(f"Using weights: `{weights}`")
+    test_up = st.file_uploader(
+        "Upload a test image",
+        type=["png", "jpg", "jpeg", "webp"], key="det_ft_test_img")
+    if test_up is not None:
+        try:
+            pil = Image.open(test_up).convert("RGB")
+        except Exception as e:
+            st.error(f"Could not open image: {type(e).__name__}: {e}")
+            return
+        try:
+            with st.spinner("Running inference..."):
+                annotated, df = predict_yolov8(pil, weights_path=weights)
+        except Exception as e:
+            st.error(f"Inference failed: {type(e).__name__}: {e}")
+            return
+        c1, c2 = st.columns(2)
+        with c1:
+            st.image(pil, caption="Original", use_container_width=True)
+        with c2:
+            st.image(annotated, caption="Fine-tuned detections",
+                     use_container_width=True)
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No objects detected. Try a different image, or train "
+                    "for more epochs.")
 
 
 # ============================================================ SEGMENTATION (LOCKED)
