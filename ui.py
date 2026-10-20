@@ -101,6 +101,7 @@ def _build_theme(p: dict) -> str:
     .stApp {{
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: {p['bg']};
+        color: {p['text']};
     }}
 
     .block-container {{
@@ -116,20 +117,52 @@ def _build_theme(p: dict) -> str:
         font-weight: 800;
     }}
 
-    p, span, div {{ color: {p['text_muted']}; }}
+    /* ---------- PRIMARY TEXT CONTRAST FIX ---------- */
+    /* Ensure native markdown, metrics, dataframes, and expanders use the high-contrast text color */
+    .stMarkdown p, .stMarkdown li, .stMarkdown span, .stMarkdown div,
+    .stText, .stDataFrame td, .stDataFrame th, .stDataFrame div,
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {{
+        color: {p['text']} !important;
+    }}
+    
+    /* Keep captions and form labels muted for hierarchy */
+    .stCaption, .stCaption p, label, .st-emotion-cache-16idsys p {{
+        color: {p['text_muted']} !important;
+    }}
+
+    /* Style Streamlit Alerts (info, warning, error, success) */
+    div[data-testid="stNotification"] {{
+        background-color: {p['bg_soft']} !important;
+        border: 1px solid {p['border']} !important;
+        border-radius: 12px;
+    }}
+    div[data-testid="stNotification"] p, div[data-testid="stNotification"] span {{
+        color: {p['text']} !important;
+    }}
+
+    /* Dropdown menus text */
+    div[data-baseweb="menu"] {{
+        background-color: {p['card_bg']} !important;
+    }}
+    div[data-baseweb="menu"] div {{
+        color: {p['text']} !important;
+    }}
+    div[data-baseweb="menu"] li:hover {{
+        background-color: {p['accent_soft']} !important;
+    }}
 
     /* ---------- INPUT STYLING ---------- */
     .stTextInput input,
     .stNumberInput input,
     .stTextArea textarea {{
         background-color: {p['input_bg']} !important;
-        color: {p['input_text']} !important;
+        color: {p['text']} !important;
         border: 1px solid {p['input_border']} !important;
         border-radius: 10px !important;
     }}
     .stTextInput input::placeholder,
     .stTextArea textarea::placeholder {{
-        color: {p['input_placeholder']} !important;
+        color: {p['text_dim']} !important;
         opacity: 1 !important;
     }}
     .stTextInput input:focus,
@@ -138,22 +171,11 @@ def _build_theme(p: dict) -> str:
         border-color: {p['accent']} !important;
         box-shadow: 0 0 0 3px {p['accent_soft']} !important;
     }}
-    .stTextInput label,
-    .stTextArea label,
-    .stNumberInput label,
-    .stSelectbox label,
-    .stMultiSelect label,
-    .stRadio label,
-    .stCheckbox label {{
-        color: {p['text_muted']} !important;
-        font-size: 0.85rem !important;
-        font-weight: 600 !important;
-    }}
 
     /* Selectbox */
     .stSelectbox div[data-baseweb="select"] > div {{
         background-color: {p['input_bg']} !important;
-        color: {p['input_text']} !important;
+        color: {p['text']} !important;
         border-color: {p['input_border']} !important;
     }}
     .stSelectbox div[data-baseweb="select"] svg {{
@@ -176,6 +198,9 @@ def _build_theme(p: dict) -> str:
         color: {p['text_muted']} !important;
         border-color: {p['input_border']} !important;
     }}
+
+    /* Expanders */
+    details summary {{ color: {p['text']} !important; }}
 
     /* ---------- HERO ---------- */
     .hero {{
@@ -258,7 +283,7 @@ def _build_theme(p: dict) -> str:
     }}
     .stat .num {{ font-size: 2.2rem; font-weight: 800;
                   color: {p['accent']}; margin: 0; line-height: 1.1; }}
-    .stat .lbl {{ font-size: 0.75rem; color: {p['text_dim']};
+    .stat .lbl {{ font-size: 0.75rem; color: {p['text_muted']};
                   text-transform: uppercase; letter-spacing: 0.1em;
                   margin-top: 0.5rem; font-weight: 700; }}
 
@@ -773,8 +798,6 @@ def _byte_tour_dialog():
 
     if st.button("Got it — let's go!", type="primary",
                  use_container_width=True, key="tour_close"):
-        # `_byte_tour_done` is already True (set in render_byte_chat before
-        # showing this dialog), so a rerun is enough to close it.
         st.rerun()
 
 
@@ -838,20 +861,12 @@ def render_byte_chat(context_hint="", show_tour_if_new=True):
     Called from app.py after render_byte(). Handles:
       - First-visit onboarding tour (once per session)
       - Modal chat while `_byte_modal == "chat"`
-
-    IMPORTANT: we do NOT clear `_byte_modal` after opening the chat. On every
-    Streamlit rerun (including the rerun that a form submission triggers) the
-    dialog must be re-invoked for the modal to stay open. It is only cleared
-    when the user explicitly clicks "Close" inside the dialog.
     """
-    # Tour: mark done as soon as it's shown, so the X button also dismisses it
-    # permanently. The explicit "Got it" button just triggers a rerun.
     if (show_tour_if_new
             and not st.session_state.get("_byte_tour_done")):
         st.session_state["_byte_tour_done"] = True
         _byte_tour_dialog()
 
-    # Chat: kept open while the flag is set (until "Close" is clicked).
     if st.session_state.get("_byte_modal") == "chat":
         _byte_chat_dialog(context_hint)
 
