@@ -398,47 +398,49 @@ def _build_theme(p: dict) -> str:
         box-shadow: none !important; cursor: pointer !important;
     }}
 
-    /* ---------- DIALOG FIXES ---------- */
-    div[role="dialog"], div[data-testid="stDialog"] {{
+    /* ---------- DIALOG FIXES (FORCED CONTRAST) ---------- */
+    div[data-testid="stModal"] > div,
+    div[role="dialog"] > div,
+    div[role="dialog"] {{
         background-color: {p['card_bg']} !important;
         border: 2px solid {p['accent']} !important;
         border-radius: 20px !important;
         box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 30px {p['glow']} !important;
     }}
     
-    /* Ensure inner wrapper is also dark/light mode */
-    div[role="dialog"] > div, div[data-testid="stDialog"] > div {{
-        background-color: {p['card_bg']} !important;
-    }}
-
-    /* Aggressively force all text inside dialog to high contrast */
-    div[role="dialog"] *, div[data-testid="stDialog"] * {{
+    /* Force all text inside dialog to high contrast */
+    div[data-testid="stModal"] h1, div[data-testid="stModal"] h2, div[data-testid="stModal"] h3,
+    div[data-testid="stModal"] h4, div[data-testid="stModal"] p, div[data-testid="stModal"] span,
+    div[data-testid="stModal"] label, div[data-testid="stModal"] div,
+    div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3,
+    div[role="dialog"] h4, div[role="dialog"] p, div[role="dialog"] span,
+    div[role="dialog"] label, div[role="dialog"] div {{
         color: {p['text']} !important;
     }}
     
     /* Force inputs */
-    div[role="dialog"] input, div[role="dialog"] textarea,
-    div[data-testid="stDialog"] input, div[data-testid="stDialog"] textarea {{
+    div[data-testid="stModal"] input, div[data-testid="stModal"] textarea,
+    div[role="dialog"] input, div[role="dialog"] textarea {{
         background-color: {p['input_bg']} !important;
         color: {p['text']} !important;
         border: 1px solid {p['input_border']} !important;
     }}
-    div[role="dialog"] input::placeholder,
-    div[data-testid="stDialog"] input::placeholder {{
+    div[data-testid="stModal"] input::placeholder,
+    div[role="dialog"] input::placeholder {{
         color: {p['text_muted']} !important;
     }}
 
     /* Force buttons */
-    div[role="dialog"] button, div[data-testid="stDialog"] button {{
+    div[data-testid="stModal"] button, div[role="dialog"] button {{
         background-color: {p['button_secondary_bg']} !important;
         color: {p['button_secondary_text']} !important;
         border: 1px solid {p['button_secondary_border']} !important;
     }}
-    div[role="dialog"] button p, div[role="dialog"] button div,
-    div[data-testid="stDialog"] button p, div[data-testid="stDialog"] button div {{
+    div[data-testid="stModal"] button p, div[data-testid="stModal"] button div,
+    div[role="dialog"] button p, div[role="dialog"] button div {{
         color: inherit !important;
     }}
-    div[role="dialog"] button[kind="primary"], div[data-testid="stDialog"] button[kind="primary"] {{
+    div[data-testid="stModal"] button[kind="primary"], div[role="dialog"] button[kind="primary"] {{
         background-color: {p['button_primary_bg']} !important;
         color: {p['button_primary_text']} !important;
         border: none !important;
