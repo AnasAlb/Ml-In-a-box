@@ -106,7 +106,24 @@ def render_home():
         _html(f'<div class="card"><h4>{t("home_card_3_title")}</h4>'
               f'<p>{t("home_card_3_body")}</p></div>')
 
+    st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)
+
+    # ---- VIDEO SECTION ----
+    _html('<h2 style="text-align: center; margin-bottom: 1rem;">Watch the Intro</h2>')
+    video_path = "intro.mp4"
+    if os.path.exists(video_path):
+        st.video(video_path)
+    else:
+        st.info("Place `intro.mp4` in the root folder of the project to see the intro video.")
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    if st.button("Learn more about us →", type="primary", use_container_width=True, key="home_to_about"):
+        st.session_state.page = "about"
+        st.rerun()
+
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+    
+    # ---- STATUS FOOTER ----
     status = torch_status()
     status_color = ("#34D399" if status["cuda"]
                     else "#F59E0B" if status["torch"] else "#9CA3AF")
@@ -127,7 +144,6 @@ def render_home():
         f'<span style="font-size: 0.9rem;">{status_text}{user_info}</span></div>')
 
     ui.sisyphus()
-
 
 # ============================================================ MODEL ZIP
 def _build_model_zip(extras, target, task, results, clean_plan):

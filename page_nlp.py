@@ -36,9 +36,6 @@ def _load_embedder():
     except Exception:
         from sklearn.feature_extraction.text import TfidfVectorizer
 
-        # TF-IDF must be *fitted on the corpus* and only ever `transform`ed
-        # for queries. Fitting on every query (as before) produced vectors of
-        # a different shape and crashed on the second question.
         class TfidfEncoder:
             def __init__(self):
                 self.vectorizer = TfidfVectorizer(stop_words="english",
@@ -301,7 +298,7 @@ NL_KEYS = ("doc_input", "doc_pages", "doc_filename", "doc_chunks",
            "doc_tokens", "doc_extractive", "doc_abstractive",
            "doc_phrases", "doc_clusters", "doc_search_results",
            "doc_rag_history", "doc_api_key", "_doc_clean_hash",
-           "_doc_last_sig")
+           "_doc_last_sig", "doc_upl_n")
 
 
 def _init_state():
@@ -314,6 +311,8 @@ def _init_state():
         st.session_state["doc_chunks"] = []
     if st.session_state.get("doc_rag_history") is None:
         st.session_state["doc_rag_history"] = []
+    if st.session_state.get("doc_upl_n") is None:
+        st.session_state["doc_upl_n"] = 0
 
 
 def _reset_derived():
@@ -321,6 +320,16 @@ def _reset_derived():
               "doc_extractive", "doc_abstractive", "doc_phrases",
               "doc_clusters", "doc_search_results", "_doc_clean_hash"):
         st.session_state[k] = None
+
+
+def _reset_all():
+    for k in NL_KEYS:
+        st.session_state[k] = None
+    st.session_state["doc_pages"] = []
+    st.session_state["doc_chunks"] = []
+    st.session_state["doc_rag_history"] = []
+    st.session_state["doc_upl_n"] += 1
+    st.rerun()
 
 
 def _ingest_file(up):
@@ -371,7 +380,6 @@ def _ingest_file(up):
     st.session_state["doc_chunks"] = chunks
     st.session_state["doc_embedder"] = embedder
     st.session_state["doc_vectors"] = vectors
-    # A new document means old RAG answers are invalid.
     st.session_state["doc_rag_history"] = []
     _reset_derived()
     st.success(f"Indexed {len(pages)} pages → {len(chunks)} chunks from {up.name}")
@@ -453,11 +461,18 @@ def render_tools():
 
     st.markdown(t("doc_upload_title"))
     st.caption(t("doc_upload_hint"))
-    up = st.file_uploader(
-        "Upload document",
-        type=["pdf", "docx", "txt", "md", "html", "htm", "csv"],
-        label_visibility="collapsed", key="doc_uploader")
-    _ingest_file(up)
+    
+    c1, c2 = st.columns([4, 1])
+    with c1:
+        up = st.file_uploader(
+            "Upload document",
+            type=["pdf", "docx", "txt", "md", "html", "htm", "csv"],
+            label_visibility="collapsed", key=f"doc_uploader_{st.session_state.doc_upl_n}")
+        _ingest_file(up)
+    with c2:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Reset", use_container_width=True, help="Clear everything in Doc Tools"):
+            _reset_all()
 
     pages = st.session_state.get("doc_pages") or []
     if not pages:
@@ -574,11 +589,21 @@ def render_tools():
         with cols[2]: ui.stat(f"{stats.get('reduction_pct', 0)}%", t("doc_clean_reduced"))
         with cols[3]: ui.stat(stats.get("stopwords_removed", 0), t("doc_clean_stopwords"))
 
+        st.markdown("### Cleaned Text Preview")
+        st.text_area("Cleaned Output", cleaned[:5000], height=200, key="doc_cleaned_display", label_visibility="collapsed")
+        
         if st.button(t("doc_tokenize_btn"), key="doc_tokenize_btn"):
             st.session_state["doc_tokens"] = tokenize(
                 cleaned, keep_stopwords=not opt_stops)
+        
         tokens = st.session_state.get("doc_tokens")
         if tokens:
+            st.markdown("### Tokenized Text Preview")
+            sample_tokens = " | ".join(tokens[:200])
+            if len(tokens) > 200:
+                sample_tokens += f" ... (and {len(tokens)-200} more)"
+            st.text_area("Tokens", sample_tokens, height=150, key="doc_tokens_display", label_visibility="collapsed")
+            
             st.metric(t("doc_tokenize_count"), f"{len(tokens):,}")
             counts = Counter(tokens).most_common(25)
             if counts:

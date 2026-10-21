@@ -121,7 +121,9 @@ def _build_theme(p: dict) -> str:
     /* Ensure native markdown, metrics, dataframes, and expanders use the high-contrast text color */
     .stMarkdown p, .stMarkdown li, .stMarkdown span, .stMarkdown div,
     .stText, .stDataFrame td, .stDataFrame th, .stDataFrame div,
-    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {{
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
+    div[data-testid="stExpander"] p, div[data-testid="stExpander"] span,
+    button[data-baseweb="tab"] {{
         color: {p['text']} !important;
     }}
     
@@ -380,7 +382,7 @@ def _build_theme(p: dict) -> str:
 
     /* ---------- BYTE VISUAL ---------- */
     .byte-visual {{
-        position: fixed; bottom: 25px; right: 25px;
+        position: fixed; bottom: 80px; right: 25px;
         z-index: 9998; pointer-events: none;
         animation: bobByte 3s ease-in-out infinite;
     }}
@@ -442,10 +444,29 @@ def _build_theme(p: dict) -> str:
     .byte-treads::before {{ left: 8px; }}
     .byte-treads::after  {{ right: 8px; }}
 
+    /* Speech Bubble */
+    .byte-bubble {{
+        position: absolute; right: 90px; bottom: 20px;
+        background: #FCD34D; color: #78350F;
+        padding: 10px 15px; border-radius: 20px;
+        font-weight: 700; font-size: 0.85rem; width: max-content;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2); border: 2px solid #78350F;
+        animation: pulseBubble 2s infinite;
+    }}
+    .byte-bubble::after {{
+        content: ''; position: absolute; bottom: 10px; right: -10px;
+        border-width: 10px 0 10px 10px; border-style: solid;
+        border-color: transparent transparent transparent #FCD34D;
+    }}
+    @keyframes pulseBubble {{
+        0%, 100% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.05); }}
+    }}
+
     /* Invisible click overlay on Byte */
     .st-key-byte_button {{
         position: fixed !important;
-        bottom: 25px !important;
+        bottom: 80px !important;
         right: 25px !important;
         width: 80px !important;
         height: 80px !important;
@@ -555,10 +576,9 @@ def render_robot(caption="Agent is ready..."):
 
 
 # ============================================================
-# TRAINING GAME (TIC-TAC-TOE) — fixed minimax side-effects
+# TRAINING GAME (TIC-TAC-TOE)
 # ============================================================
 def render_training_game():
-    """Embeds a playable Tic-Tac-Toe game to entertain users during training."""
     p = _palette(st.session_state.get("theme", "light"))
 
     style = f"""
@@ -636,7 +656,6 @@ def render_training_game():
             const cells = document.querySelectorAll('.cell');
             const statusDisplay = document.getElementById('status');
 
-            // Pure outcome check — must NOT mutate any game state.
             function getOutcome(b) {
                 for (const [i, j, k] of winConditions) {
                     if (b[i] && b[i] === b[j] && b[i] === b[k]) return b[i];
@@ -761,6 +780,7 @@ def render_byte(tooltip="Hi, I'm Byte! Click me to chat."):
     """Render Byte's visual + invisible clickable overlay."""
     _render_html(
         '<div class="byte-visual" title="' + tooltip + '">'
+        '<div class="byte-bubble">Hello! I\'m Byte. Ask me anything and I\'ll help you out.</div>'
         '<div class="byte">'
         '<div class="byte-head">'
         '<div class="byte-eye"></div><div class="byte-eye"></div>'
@@ -774,31 +794,6 @@ def render_byte(tooltip="Hi, I'm Byte! Click me to chat."):
         if st.button(" ", key="byte_click", use_container_width=True):
             st.session_state["_byte_modal"] = "chat"
             st.rerun()
-
-
-@st.dialog("👋 Hi, I'm Byte!", width="large")
-def _byte_tour_dialog():
-    st.markdown(
-        "I'm your little guide for ML in a Box. Here's what each page does:"
-    )
-    items = [
-        ("🏠 Home", "the landing page — quick-start buttons and a look at the pipeline."),
-        ("🔎 Data Profiler", "upload a dataset (CSV/Excel) or a saved model (.zip)."),
-        ("⚡ Run Pipeline", "train models, explain decisions, download the result."),
-        ("📄 Doc Tools", "upload documents, ask questions with citations, summarize."),
-        ("🤖 Agent Builder", "design your own AI agent and download a blueprint."),
-        ("📖 Knowledge", "interactive concept map — AI, ML, DL, LLM, CV, NLP, Agentic."),
-        ("ℹ️ About", "who built this and what it does."),
-    ]
-    for title, desc in items:
-        st.markdown(f"**{title}** — {desc}")
-
-    st.markdown("---")
-    st.caption("Click me any time in the corner and I'll answer questions.")
-
-    if st.button("Got it — let's go!", type="primary",
-                 use_container_width=True, key="tour_close"):
-        st.rerun()
 
 
 @st.dialog("🤖 Byte — your assistant", width="large")
@@ -857,16 +852,8 @@ def _byte_chat_dialog(context_hint=""):
 
 
 def render_byte_chat(context_hint="", show_tour_if_new=True):
-    """
-    Called from app.py after render_byte(). Handles:
-      - First-visit onboarding tour (once per session)
-      - Modal chat while `_byte_modal == "chat"`
-    """
-    if (show_tour_if_new
-            and not st.session_state.get("_byte_tour_done")):
-        st.session_state["_byte_tour_done"] = True
-        _byte_tour_dialog()
-
+    """Handles the modal chat."""
+    # The tour is disabled by request; bubble serves this purpose now.
     if st.session_state.get("_byte_modal") == "chat":
         _byte_chat_dialog(context_hint)
 
