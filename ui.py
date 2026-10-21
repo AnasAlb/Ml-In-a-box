@@ -118,7 +118,6 @@ def _build_theme(p: dict) -> str:
     }}
 
     /* ---------- PRIMARY TEXT CONTRAST FIX ---------- */
-    /* Ensure native markdown, metrics, dataframes, and expanders use the high-contrast text color */
     .stMarkdown p, .stMarkdown li, .stMarkdown span, .stMarkdown div,
     .stText, .stDataFrame td, .stDataFrame th, .stDataFrame div,
     [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
@@ -127,12 +126,11 @@ def _build_theme(p: dict) -> str:
         color: {p['text']} !important;
     }}
     
-    /* Keep captions and form labels muted for hierarchy */
     .stCaption, .stCaption p, label, .st-emotion-cache-16idsys p {{
         color: {p['text_muted']} !important;
     }}
 
-    /* Style Streamlit Alerts (info, warning, error, success) */
+    /* Style Streamlit Alerts */
     div[data-testid="stNotification"] {{
         background-color: {p['bg_soft']} !important;
         border: 1px solid {p['border']} !important;
@@ -143,33 +141,22 @@ def _build_theme(p: dict) -> str:
     }}
 
     /* Dropdown menus text */
-    div[data-baseweb="menu"] {{
-        background-color: {p['card_bg']} !important;
-    }}
-    div[data-baseweb="menu"] div {{
-        color: {p['text']} !important;
-    }}
-    div[data-baseweb="menu"] li:hover {{
-        background-color: {p['accent_soft']} !important;
-    }}
+    div[data-baseweb="menu"] {{ background-color: {p['card_bg']} !important; }}
+    div[data-baseweb="menu"] div {{ color: {p['text']} !important; }}
+    div[data-baseweb="menu"] li:hover {{ background-color: {p['accent_soft']} !important; }}
 
     /* ---------- INPUT STYLING ---------- */
-    .stTextInput input,
-    .stNumberInput input,
-    .stTextArea textarea {{
+    .stTextInput input, .stNumberInput input, .stTextArea textarea {{
         background-color: {p['input_bg']} !important;
         color: {p['text']} !important;
         border: 1px solid {p['input_border']} !important;
         border-radius: 10px !important;
     }}
-    .stTextInput input::placeholder,
-    .stTextArea textarea::placeholder {{
+    .stTextInput input::placeholder, .stTextArea textarea::placeholder {{
         color: {p['text_dim']} !important;
         opacity: 1 !important;
     }}
-    .stTextInput input:focus,
-    .stTextArea textarea:focus,
-    .stNumberInput input:focus {{
+    .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus {{
         border-color: {p['accent']} !important;
         box-shadow: 0 0 0 3px {p['accent_soft']} !important;
     }}
@@ -180,9 +167,7 @@ def _build_theme(p: dict) -> str:
         color: {p['text']} !important;
         border-color: {p['input_border']} !important;
     }}
-    .stSelectbox div[data-baseweb="select"] svg {{
-        fill: {p['text_muted']} !important;
-    }}
+    .stSelectbox div[data-baseweb="select"] svg {{ fill: {p['text_muted']} !important; }}
 
     /* Multiselect */
     .stMultiSelect div[data-baseweb="select"] > div {{
@@ -194,26 +179,19 @@ def _build_theme(p: dict) -> str:
         color: {p['accent_text']} !important;
     }}
 
-    /* Number input +/- buttons */
     .stNumberInput button {{
         background-color: {p['card_bg']} !important;
         color: {p['text_muted']} !important;
         border-color: {p['input_border']} !important;
     }}
 
-    /* Expanders */
     details summary {{ color: {p['text']} !important; }}
 
     /* ---------- HERO ---------- */
     .hero {{
-        padding: 4rem 3rem;
-        border-radius: 32px;
-        background: {p['bg_soft']};
-        border: 1px solid {p['border_accent']};
-        box-shadow: {p['shadow_md']};
-        margin-bottom: 3rem;
-        position: relative;
-        overflow: hidden;
+        padding: 4rem 3rem; border-radius: 32px; background: {p['bg_soft']};
+        border: 1px solid {p['border_accent']}; box-shadow: {p['shadow_md']};
+        margin-bottom: 3rem; position: relative; overflow: hidden;
     }}
     .hero::before {{
         content: ""; position: absolute; top: -50%; right: -10%;
@@ -231,8 +209,7 @@ def _build_theme(p: dict) -> str:
         font-size: 4rem; margin: 0; padding-bottom: 8px;
         background: linear-gradient(135deg, {p['text']} 0%, {p['accent']} 100%);
         -webkit-background-clip: text; background-clip: text;
-        -webkit-text-fill-color: transparent;
-        line-height: 1.1; position: relative; z-index: 1;
+        -webkit-text-fill-color: transparent; line-height: 1.1; position: relative; z-index: 1;
     }}
     .hero p {{
         font-size: 1.2rem; color: {p['text_muted']};
@@ -242,119 +219,81 @@ def _build_theme(p: dict) -> str:
 
     /* ---------- CARDS ---------- */
     .card {{
-        background: {p['card_bg']};
-        border: 1px solid {p['border']};
-        border-radius: 20px;
-        padding: 1.8rem; margin-bottom: 1.5rem;
-        box-shadow: {p['shadow_sm']};
-        position: relative;
-        overflow: hidden;
+        background: {p['card_bg']}; border: 1px solid {p['border']};
+        border-radius: 20px; padding: 1.8rem; margin-bottom: 1.5rem;
+        box-shadow: {p['shadow_sm']}; position: relative; overflow: hidden;
     }}
-    .card:hover {{
-        border-color: {p['accent']};
-        box-shadow: {p['shadow_md']};
-    }}
-    .card h4 {{ margin: 0 0 0.6rem 0; color: {p['text']};
-                font-size: 1.05rem; font-weight: 700; }}
-    .card p {{ margin: 0; color: {p['text_muted']};
-               font-size: 0.95rem; line-height: 1.6; }}
+    .card:hover {{ border-color: {p['accent']}; box-shadow: {p['shadow_md']}; }}
+    .card h4 {{ margin: 0 0 0.6rem 0; color: {p['text']}; font-size: 1.05rem; font-weight: 700; }}
+    .card p {{ margin: 0; color: {p['text_muted']}; font-size: 0.95rem; line-height: 1.6; }}
 
     /* ---------- PILLS ---------- */
     .pill {{
         display: inline-block; padding: 6px 16px; border-radius: 30px;
         background: {p['pill_bg']}; color: {p['pill_text']};
-        font-size: 0.75rem; font-weight: 700;
-        margin-right: 8px; margin-bottom: 8px;
+        font-size: 0.75rem; font-weight: 700; margin-right: 8px; margin-bottom: 8px;
         border: 1px solid {p['pill_border']};
     }}
-    .pill.purple {{ background: {p['pill_purple_bg']};
-                    color: {p['pill_purple_text']};
-                    border-color: {p['pill_purple_border']}; }}
-    .pill.amber  {{ background: {p['pill_amber_bg']};
-                    color: {p['pill_amber_text']};
-                    border-color: {p['pill_amber_border']}; }}
-    .pill.red    {{ background: {p['pill_red_bg']};
-                    color: {p['pill_red_text']};
-                    border-color: {p['pill_red_border']}; }}
+    .pill.purple {{ background: {p['pill_purple_bg']}; color: {p['pill_purple_text']}; border-color: {p['pill_purple_border']}; }}
+    .pill.amber  {{ background: {p['pill_amber_bg']}; color: {p['pill_amber_text']}; border-color: {p['pill_amber_border']}; }}
+    .pill.red    {{ background: {p['pill_red_bg']}; color: {p['pill_red_text']}; border-color: {p['pill_red_border']}; }}
 
     /* ---------- STATS ---------- */
     .stat {{
-        padding: 1.5rem; border-radius: 20px;
-        background: {p['card_bg']}; border: 1px solid {p['border']};
-        box-shadow: {p['shadow_sm']}; text-align: center;
+        padding: 1.5rem; border-radius: 20px; background: {p['card_bg']};
+        border: 1px solid {p['border']}; box-shadow: {p['shadow_sm']}; text-align: center;
     }}
-    .stat .num {{ font-size: 2.2rem; font-weight: 800;
-                  color: {p['accent']}; margin: 0; line-height: 1.1; }}
-    .stat .lbl {{ font-size: 0.75rem; color: {p['text_muted']};
-                  text-transform: uppercase; letter-spacing: 0.1em;
-                  margin-top: 0.5rem; font-weight: 700; }}
+    .stat .num {{ font-size: 2.2rem; font-weight: 800; color: {p['accent']}; margin: 0; line-height: 1.1; }}
+    .stat .lbl {{ font-size: 0.75rem; color: {p['text_muted']}; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.5rem; font-weight: 700; }}
 
     /* ---------- TRACE ---------- */
     .trace {{
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem; color: {p['text_muted']};
-        padding: 6px 0 6px 12px;
-        border-left: 2px solid {p['accent']};
-        margin-bottom: 4px; background: {p['bg_soft']};
-        border-radius: 0 8px 8px 0;
+        font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+        color: {p['text_muted']}; padding: 6px 0 6px 12px;
+        border-left: 2px solid {p['accent']}; margin-bottom: 4px;
+        background: {p['bg_soft']}; border-radius: 0 8px 8px 0;
     }}
     .trace::before {{ content: "› "; color: {p['accent']}; font-weight: bold; }}
 
     /* ---------- PROSE ---------- */
-    .prose {{ max-width: 820px; color: {p['text_muted']};
-              font-size: 1.02rem; line-height: 1.75; }}
-    .prose h3 {{ margin-top: 1.8rem; margin-bottom: 0.4rem;
-                 color: {p['accent']}; font-size: 1.15rem; font-weight: 700; }}
+    .prose {{ max-width: 820px; color: {p['text_muted']}; font-size: 1.02rem; line-height: 1.75; }}
+    .prose h3 {{ margin-top: 1.8rem; margin-bottom: 0.4rem; color: {p['accent']}; font-size: 1.15rem; font-weight: 700; }}
     .prose p {{ margin: 0 0 1rem 0; }}
     .prose strong {{ color: {p['text']}; }}
 
     /* ---------- DEPLOYMENT LOCK ---------- */
     .deploy-locked {{ position: relative; overflow: hidden; border-radius: 20px; }}
-    .deploy-locked .deploy-inner {{
-        background: {p['card_bg']}; border: 1px solid {p['border']};
-        border-radius: 20px; padding: 1.5rem 1.7rem;
-    }}
+    .deploy-locked .deploy-inner {{ background: {p['card_bg']}; border: 1px solid {p['border']}; border-radius: 20px; padding: 1.5rem 1.7rem; }}
     .deploy-locked .deploy-inner h4 {{ color: {p['pill_amber_text']}; margin: 0 0 0.5rem 0; }}
     .deploy-locked .deploy-inner p {{ color: {p['text_muted']}; margin: 0; font-size: 0.9rem; }}
     .deploy-locked .lock-overlay {{
-        position: absolute; inset: 0;
-        display: flex; align-items: center; justify-content: center;
-        flex-direction: column; gap: 0.4rem;
-        background: {p['bg']}ee; opacity: 0;
-        transition: opacity 0.3s ease;
-        border-radius: 20px; backdrop-filter: blur(4px);
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 0.4rem; background: {p['bg']}ee; opacity: 0;
+        transition: opacity 0.3s ease; border-radius: 20px; backdrop-filter: blur(4px);
         pointer-events: none; z-index: 10;
     }}
     .deploy-locked:hover .lock-overlay {{ opacity: 1; }}
     .deploy-locked .lock-overlay .lock-icon {{ font-size: 2.4rem; }}
-    .deploy-locked .lock-overlay .lock-text {{ color: {p['pill_amber_text']};
-                                                 font-weight: 700; font-size: 1rem; }}
-    .deploy-locked .lock-overlay .lock-sub {{ color: {p['text_muted']};
-                                                font-size: 0.82rem;
-                                                max-width: 380px; text-align: center; }}
+    .deploy-locked .lock-overlay .lock-text {{ color: {p['pill_amber_text']}; font-weight: 700; font-size: 1rem; }}
+    .deploy-locked .lock-overlay .lock-sub {{ color: {p['text_muted']}; font-size: 0.82rem; max-width: 380px; text-align: center; }}
 
     /* ---------- BUTTONS ---------- */
     .stButton button[kind="primary"] {{
-        background: {p['button_primary_bg']};
-        color: {p['button_primary_text']};
-        font-weight: 700; border: none;
-        box-shadow: 0 4px 14px {p['glow']};
+        background: {p['button_primary_bg']}; color: {p['button_primary_text']};
+        font-weight: 700; border: none; box-shadow: 0 4px 14px {p['glow']};
         border-radius: 12px; padding: 0.6rem 1.5rem;
     }}
     .stButton button[kind="primary"]:hover {{
-        background: {p['button_primary_hover']};
-        box-shadow: 0 6px 20px {p['glow']};
+        background: {p['button_primary_hover']}; box-shadow: 0 6px 20px {p['glow']};
         transform: translateY(-1px);
     }}
     .stButton button:not([kind="primary"]) {{
-        background: {p['button_secondary_bg']};
-        color: {p['button_secondary_text']};
-        border: 1px solid {p['button_secondary_border']};
-        border-radius: 12px; padding: 0.6rem 1.5rem; font-weight: 600;
+        background: {p['button_secondary_bg']}; color: {p['button_secondary_text']};
+        border: 1px solid {p['button_secondary_border']}; border-radius: 12px;
+        padding: 0.6rem 1.5rem; font-weight: 600;
     }}
     .stButton button:not([kind="primary"]):hover {{
-        border-color: {p['btn_secondary_hover_border']};
-        color: {p['btn_secondary_hover_text']};
+        border-color: {p['btn_secondary_hover_border']}; color: {p['btn_secondary_hover_text']};
         background: {p['btn_secondary_hover_bg']};
     }}
 
@@ -363,26 +302,21 @@ def _build_theme(p: dict) -> str:
 
     /* ---------- WATERMARK ---------- */
     .wm {{
-        position: fixed; bottom: 0; left: 0; right: 0;
-        text-align: center; padding: 1rem;
+        position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 1rem;
         background: linear-gradient(180deg, transparent, {p['bg']}dd 60%);
-        color: {p['text_dim']}; font-size: 0.8rem;
-        z-index: 900; pointer-events: none;
+        color: {p['text_dim']}; font-size: 0.8rem; z-index: 900; pointer-events: none;
     }}
     .wm b {{ color: {p['text_muted']}; font-weight: 600; }}
     .wm .brand {{ color: {p['accent']}; font-weight: 700; }}
     .wm .sep {{ opacity: 0.5; margin: 0 0.5rem; }}
 
     /* ---------- SISYPHUS ---------- */
-    .sisyphus {{
-        margin-top: 3rem; margin-bottom: 2rem; text-align: right;
-        color: {p['text_dim']}; font-style: italic; font-size: 0.95rem;
-    }}
+    .sisyphus {{ margin-top: 3rem; margin-bottom: 2rem; text-align: right; color: {p['text_dim']}; font-style: italic; font-size: 0.95rem; }}
     .sisyphus em {{ color: {p['accent']}; font-style: italic; }}
 
     /* ---------- BYTE VISUAL ---------- */
     .byte-visual {{
-        position: fixed; bottom: 80px; right: 25px;
+        position: fixed; bottom: 120px; right: 25px;
         z-index: 9998; pointer-events: none;
         animation: bobByte 3s ease-in-out infinite;
     }}
@@ -390,40 +324,30 @@ def _build_theme(p: dict) -> str:
         0%, 100% {{ transform: translateY(0); }}
         50%      {{ transform: translateY(-8px); }}
     }}
-    .byte {{
-        position: relative; width: 80px; height: 80px;
-    }}
+    .byte {{ position: relative; width: 80px; height: 80px; }}
     .byte-body {{
-        position: absolute; bottom: 12px; left: 50%;
-        transform: translateX(-50%);
-        width: 52px; height: 40px;
-        background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
+        position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+        width: 52px; height: 40px; background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
         border: 2px solid #78350F; border-radius: 6px;
-        box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25),
-                    0 0 14px {p['glow']};
+        box-shadow: inset -4px -4px 8px rgba(0,0,0,0.25), 0 0 14px {p['glow']};
     }}
     .byte-body::after {{
         content: ""; position: absolute; bottom: 6px; left: 8px;
         width: 14px; height: 6px; background: #78350F; border-radius: 2px;
     }}
     .byte-neck {{
-        position: absolute; bottom: 52px; left: 50%;
-        transform: translateX(-50%);
+        position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
         width: 6px; height: 10px; background: #78350F; border-radius: 2px;
     }}
     .byte-head {{
-        position: absolute; bottom: 62px; left: 50%;
-        transform: translateX(-50%);
-        width: 46px; height: 22px;
-        background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
+        position: absolute; bottom: 62px; left: 50%; transform: translateX(-50%);
+        width: 46px; height: 22px; background: linear-gradient(180deg, #FCD34D 0%, #F59E0B 100%);
         border: 2px solid #78350F; border-radius: 11px;
-        display: flex; align-items: center; justify-content: center;
-        gap: 6px;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
     }}
     .byte-eye {{
-        width: 12px; height: 12px; background: #0EA5E9;
-        border: 2px solid #78350F; border-radius: 50%;
-        box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);
+        width: 12px; height: 12px; background: #0EA5E9; border: 2px solid #78350F;
+        border-radius: 50%; box-shadow: 0 0 6px rgba(14, 165, 233, 0.8);
         animation: blinkByte 4s infinite;
     }}
     @keyframes blinkByte {{
@@ -431,77 +355,107 @@ def _build_theme(p: dict) -> str:
         94% {{ transform: scaleY(0.1); }}
     }}
     .byte-treads {{
-        position: absolute; bottom: 4px; left: 50%;
-        transform: translateX(-50%);
-        width: 66px; height: 14px;
-        background: #1F2937; border: 2px solid #111827; border-radius: 8px;
+        position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+        width: 66px; height: 14px; background: #1F2937; border: 2px solid #111827; border-radius: 8px;
     }}
     .byte-treads::before, .byte-treads::after {{
-        content: ""; position: absolute; top: 50%;
-        width: 6px; height: 6px; background: #4B5563;
-        border-radius: 50%; transform: translateY(-50%);
+        content: ""; position: absolute; top: 50%; width: 6px; height: 6px;
+        background: #4B5563; border-radius: 50%; transform: translateY(-50%);
     }}
     .byte-treads::before {{ left: 8px; }}
     .byte-treads::after  {{ right: 8px; }}
 
-    /* Speech Bubble */
+    /* Speech Bubble fading out after 5s */
     .byte-bubble {{
-        position: absolute; right: 90px; bottom: 20px;
+        position: absolute; right: 90px; bottom: 30px;
         background: #FCD34D; color: #78350F;
         padding: 10px 15px; border-radius: 20px;
         font-weight: 700; font-size: 0.85rem; width: max-content;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2); border: 2px solid #78350F;
-        animation: pulseBubble 2s infinite;
+        animation: fadeBubble 5s forwards;
     }}
     .byte-bubble::after {{
         content: ''; position: absolute; bottom: 10px; right: -10px;
         border-width: 10px 0 10px 10px; border-style: solid;
         border-color: transparent transparent transparent #FCD34D;
     }}
-    @keyframes pulseBubble {{
-        0%, 100% {{ transform: scale(1); }}
-        50% {{ transform: scale(1.05); }}
+    @keyframes fadeBubble {{
+        0% {{ opacity: 0; transform: translateY(10px); }}
+        10% {{ opacity: 1; transform: translateY(0); }}
+        80% {{ opacity: 1; transform: translateY(0); visibility: visible; }}
+        100% {{ opacity: 0; transform: translateY(-10px); visibility: hidden; }}
     }}
 
     /* Invisible click overlay on Byte */
     .st-key-byte_button {{
-        position: fixed !important;
-        bottom: 80px !important;
-        right: 25px !important;
-        width: 80px !important;
-        height: 80px !important;
-        z-index: 10000 !important;
-        background: transparent !important;
+        position: fixed !important; bottom: 120px !important; right: 25px !important;
+        width: 80px !important; height: 80px !important;
+        z-index: 10000 !important; background: transparent !important;
     }}
     .st-key-byte_button .stButton > button {{
-        width: 80px !important;
-        height: 80px !important;
-        opacity: 0 !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        cursor: pointer !important;
+        width: 80px !important; height: 80px !important; opacity: 0 !important;
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; cursor: pointer !important;
     }}
 
-    /* Modal look — dialog overlay gets themed */
-    div[role="dialog"] {{
+    /* ---------- DIALOG FIXES ---------- */
+    div[role="dialog"], div[data-testid="stDialog"] {{
         background-color: {p['card_bg']} !important;
         border: 2px solid {p['accent']} !important;
         border-radius: 20px !important;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.4),
-                    0 0 30px {p['glow']} !important;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 30px {p['glow']} !important;
     }}
-    div[role="dialog"] h1,
-    div[role="dialog"] h2,
-    div[role="dialog"] h3,
-    div[role="dialog"] h4 {{
+    
+    /* Ensure inner wrapper is also dark/light mode */
+    div[role="dialog"] > div, div[data-testid="stDialog"] > div {{
+        background-color: {p['card_bg']} !important;
+    }}
+
+    /* Aggressively force all text inside dialog to high contrast */
+    div[role="dialog"] *, div[data-testid="stDialog"] * {{
         color: {p['text']} !important;
     }}
-    div[role="dialog"] p,
-    div[role="dialog"] span,
-    div[role="dialog"] div {{
-        color: {p['text_muted']};
+    
+    /* Force inputs */
+    div[role="dialog"] input, div[role="dialog"] textarea,
+    div[data-testid="stDialog"] input, div[data-testid="stDialog"] textarea {{
+        background-color: {p['input_bg']} !important;
+        color: {p['text']} !important;
+        border: 1px solid {p['input_border']} !important;
     }}
+    div[role="dialog"] input::placeholder,
+    div[data-testid="stDialog"] input::placeholder {{
+        color: {p['text_muted']} !important;
+    }}
+
+    /* Force buttons */
+    div[role="dialog"] button, div[data-testid="stDialog"] button {{
+        background-color: {p['button_secondary_bg']} !important;
+        color: {p['button_secondary_text']} !important;
+        border: 1px solid {p['button_secondary_border']} !important;
+    }}
+    div[role="dialog"] button p, div[role="dialog"] button div,
+    div[data-testid="stDialog"] button p, div[data-testid="stDialog"] button div {{
+        color: inherit !important;
+    }}
+    div[role="dialog"] button[kind="primary"], div[data-testid="stDialog"] button[kind="primary"] {{
+        background-color: {p['button_primary_bg']} !important;
+        color: {p['button_primary_text']} !important;
+        border: none !important;
+    }}
+
+    /* Chat bubble styling */
+    .chat-bubble {{
+        padding: 0.6rem 0.9rem;
+        border-radius: 12px;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        color: {p['text']} !important; /* <--- FORCE TEXT COLOR */
+    }}
+    .chat-bubble.user {{ background: {p['accent_soft']}; }}
+    .chat-bubble.assistant {{ background: {p['pill_purple_bg']}; }}
+    .chat-bubble b {{ color: {p['text']} !important; }}
 
     section[data-testid="stSidebar"] {{ display: none; }}
 </style>
@@ -596,49 +550,29 @@ def render_training_game():
             gap: 8px; margin-bottom: 15px;
         }}
         .cell {{
-            background: {p['card_bg']};
-            border: 2px solid {p['border']};
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
+            background: {p['card_bg']}; border: 2px solid {p['border']};
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
             font-size: 2.2rem; font-weight: 800; cursor: pointer;
             transition: all 0.2s ease; color: {p['accent']};
         }}
-        .cell:hover:not(.x):not(.o) {{
-            background: {p['accent_soft']};
-            border-color: {p['accent']};
-        }}
+        .cell:hover:not(.x):not(.o) {{ background: {p['accent_soft']}; border-color: {p['accent']}; }}
         .cell.x {{ color: {p['accent']}; text-shadow: 0 0 10px {p['glow']}; }}
         .cell.o {{ color: {p['accent_2']}; text-shadow: 0 0 10px {p['glow_2']}; }}
-        .status {{
-            font-size: 1.1rem; margin-bottom: 15px;
-            font-weight: 600; color: {p['text']};
-            min-height: 1.5rem;
-        }}
+        .status {{ font-size: 1.1rem; margin-bottom: 15px; font-weight: 600; color: {p['text']}; min-height: 1.5rem; }}
         button {{
-            background: {p['button_secondary_bg']};
-            color: {p['button_secondary_text']};
-            border: 1px solid {p['button_secondary_border']};
-            padding: 8px 16px; border-radius: 8px;
-            cursor: pointer; font-weight: 600;
+            background: {p['button_secondary_bg']}; color: {p['button_secondary_text']};
+            border: 1px solid {p['button_secondary_border']}; padding: 8px 16px;
+            border-radius: 8px; cursor: pointer; font-weight: 600;
         }}
-        button:hover {{
-            border-color: {p['accent']};
-            color: {p['accent']};
-        }}
+        button:hover {{ border-color: {p['accent']}; color: {p['accent']}; }}
     """
 
     body = """
         <div class="status" id="status">Your turn (X)</div>
         <div class="board">
-            <div class="cell" data-i="0"></div>
-            <div class="cell" data-i="1"></div>
-            <div class="cell" data-i="2"></div>
-            <div class="cell" data-i="3"></div>
-            <div class="cell" data-i="4"></div>
-            <div class="cell" data-i="5"></div>
-            <div class="cell" data-i="6"></div>
-            <div class="cell" data-i="7"></div>
-            <div class="cell" data-i="8"></div>
+            <div class="cell" data-i="0"></div><div class="cell" data-i="1"></div><div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div><div class="cell" data-i="4"></div><div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div><div class="cell" data-i="7"></div><div class="cell" data-i="8"></div>
         </div>
         <button onclick="resetGame()">Reset Game</button>
 
@@ -646,13 +580,7 @@ def render_training_game():
             let board = ["", "", "", "", "", "", "", "", ""];
             let currentPlayer = "X";
             let gameActive = true;
-
-            const winConditions = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8],
-                [0, 3, 6], [1, 4, 7], [2, 5, 8],
-                [0, 4, 8], [2, 4, 6]
-            ];
-
+            const winConditions = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
             const cells = document.querySelectorAll('.cell');
             const statusDisplay = document.getElementById('status');
 
@@ -669,61 +597,34 @@ def render_training_game():
             function handleCellClick(e) {
                 const index = parseInt(e.target.getAttribute('data-i'));
                 if (board[index] !== "" || !gameActive || currentPlayer !== "X") return;
-
                 makeMove(index, "X");
                 const outcome = getOutcome(board);
-                if (outcome === "X") {
-                    statusDisplay.innerText = "You win! 🎉";
-                    gameActive = false;
-                    return;
-                }
-                if (outcome === "draw") {
-                    statusDisplay.innerText = "It's a draw!";
-                    gameActive = false;
-                    return;
-                }
-                currentPlayer = "O";
-                statusDisplay.innerText = "AI is thinking...";
+                if (outcome === "X") { statusDisplay.innerText = "You win! 🎉"; gameActive = false; return; }
+                if (outcome === "draw") { statusDisplay.innerText = "It's a draw!"; gameActive = false; return; }
+                currentPlayer = "O"; statusDisplay.innerText = "AI is thinking...";
                 setTimeout(aiMove, 400);
             }
 
             function makeMove(index, player) {
-                board[index] = player;
-                const cell = cells[index];
-                cell.innerText = player;
-                cell.classList.add(player.toLowerCase());
+                board[index] = player; const cell = cells[index];
+                cell.innerText = player; cell.classList.add(player.toLowerCase());
             }
 
             function aiMove() {
                 if (!gameActive) return;
-                let bestScore = -Infinity;
-                let move = -1;
+                let bestScore = -Infinity; let move = -1;
                 for (let i = 0; i < 9; i++) {
                     if (board[i] === "") {
-                        board[i] = "O";
-                        const score = minimax(board, 0, false);
-                        board[i] = "";
-                        if (score > bestScore) {
-                            bestScore = score;
-                            move = i;
-                        }
+                        board[i] = "O"; const score = minimax(board, 0, false); board[i] = "";
+                        if (score > bestScore) { bestScore = score; move = i; }
                     }
                 }
                 if (move === -1) return;
                 makeMove(move, "O");
                 const outcome = getOutcome(board);
-                if (outcome === "O") {
-                    statusDisplay.innerText = "AI wins! 🤖";
-                    gameActive = false;
-                    return;
-                }
-                if (outcome === "draw") {
-                    statusDisplay.innerText = "It's a draw!";
-                    gameActive = false;
-                    return;
-                }
-                currentPlayer = "X";
-                statusDisplay.innerText = "Your turn (X)";
+                if (outcome === "O") { statusDisplay.innerText = "AI wins! 🤖"; gameActive = false; return; }
+                if (outcome === "draw") { statusDisplay.innerText = "It's a draw!"; gameActive = false; return; }
+                currentPlayer = "X"; statusDisplay.innerText = "Your turn (X)";
             }
 
             function minimax(b, depth, isMaximizing) {
@@ -731,39 +632,25 @@ def render_training_game():
                 if (outcome === "O") return 10 - depth;
                 if (outcome === "X") return depth - 10;
                 if (outcome === "draw") return 0;
-
                 if (isMaximizing) {
                     let best = -Infinity;
                     for (let i = 0; i < 9; i++) {
-                        if (b[i] === "") {
-                            b[i] = "O";
-                            best = Math.max(best, minimax(b, depth + 1, false));
-                            b[i] = "";
-                        }
+                        if (b[i] === "") { b[i] = "O"; best = Math.max(best, minimax(b, depth + 1, false)); b[i] = ""; }
                     }
                     return best;
                 } else {
                     let best = Infinity;
                     for (let i = 0; i < 9; i++) {
-                        if (b[i] === "") {
-                            b[i] = "X";
-                            best = Math.min(best, minimax(b, depth + 1, true));
-                            b[i] = "";
-                        }
+                        if (b[i] === "") { b[i] = "X"; best = Math.min(best, minimax(b, depth + 1, true)); b[i] = ""; }
                     }
                     return best;
                 }
             }
 
             function resetGame() {
-                board = ["", "", "", "", "", "", "", "", ""];
-                currentPlayer = "X";
-                gameActive = true;
+                board = ["", "", "", "", "", "", "", "", ""]; currentPlayer = "X"; gameActive = true;
                 statusDisplay.innerText = "Your turn (X)";
-                cells.forEach(cell => {
-                    cell.innerText = "";
-                    cell.classList.remove('x', 'o');
-                });
+                cells.forEach(cell => { cell.innerText = ""; cell.classList.remove('x', 'o'); });
             }
         </script>
     """
@@ -803,21 +690,17 @@ def _byte_chat_dialog(context_hint=""):
     if "byte_chat" not in st.session_state:
         st.session_state.byte_chat = []
 
-    # Chat history
+    # Chat history using custom classes to ensure theme safety
     for role, text in st.session_state.byte_chat[-8:]:
         if role == "user":
             st.markdown(
-                f'<div style="background:{_palette(st.session_state.get("theme","light"))["accent_soft"]};'
-                f'padding:0.6rem 0.9rem;border-radius:12px;margin-bottom:0.5rem;'
-                f'font-size:0.9rem;line-height:1.4;">'
+                f'<div class="chat-bubble user">'
                 f'<b>You:</b> {text}</div>',
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
-                f'<div style="background:{_palette(st.session_state.get("theme","light"))["pill_purple_bg"]};'
-                f'padding:0.6rem 0.9rem;border-radius:12px;margin-bottom:0.5rem;'
-                f'font-size:0.9rem;line-height:1.4;">'
+                f'<div class="chat-bubble assistant">'
                 f'<b>Byte:</b> {text}</div>',
                 unsafe_allow_html=True,
             )
@@ -853,7 +736,6 @@ def _byte_chat_dialog(context_hint=""):
 
 def render_byte_chat(context_hint="", show_tour_if_new=True):
     """Handles the modal chat."""
-    # The tour is disabled by request; bubble serves this purpose now.
     if st.session_state.get("_byte_modal") == "chat":
         _byte_chat_dialog(context_hint)
 

@@ -32,7 +32,7 @@ def init_state():
         "lang": url_lang if url_lang in ("en", "ar") else "en",
         "log": [], "chat_history": [], "retried": False,
         "byte_chat": [], "byte_chat_open": False,
-        "_byte_tour_done": False,
+        "_byte_tour_done": True, # Disabled tour
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -255,17 +255,20 @@ def render_pill_nav():
 
         with cols[0]:
             if st.button("?", key="nav_help", use_container_width=True):
+                st.session_state["_byte_modal"] = None
                 st.session_state.page = "tutorial"; st.rerun()
 
         for i, (k, label_key) in enumerate(NAV_PAGES):
             with cols[i + 1]:
                 if st.button(t(label_key), key=f"nav_{k}",
                              use_container_width=True):
+                    st.session_state["_byte_modal"] = None
                     st.session_state.page = k; st.rerun()
 
         with cols[8]:
             icon = "🌙" if st.session_state.theme == "light" else "☀️"
             if st.button(icon, key="nav_theme", use_container_width=True):
+                st.session_state["_byte_modal"] = None
                 st.session_state.theme = (
                     "dark" if st.session_state.theme == "light" else "light")
                 sync_url()
@@ -273,12 +276,14 @@ def render_pill_nav():
 
         with cols[9]:
             if st.button("EN", key="nav_lang_en", use_container_width=True):
+                st.session_state["_byte_modal"] = None
                 st.session_state.lang = "en"
                 sync_url()
                 st.rerun()
 
         with cols[10]:
             if st.button("AR", key="nav_lang_ar", use_container_width=True):
+                st.session_state["_byte_modal"] = None
                 st.session_state.lang = "ar"
                 sync_url()
                 st.rerun()
