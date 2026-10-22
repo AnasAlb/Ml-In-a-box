@@ -199,10 +199,8 @@ TUTORIAL_TABS = {
 def render_tutorial():
     ui.hero(t("tut_hero_title"), t("tut_sub"),
             pills=[t("tut_pill_1"), t("tut_pill_2"), t("tut_pill_3")])
-    _html(
-        f'<div class="card" style="text-align:center; padding:2rem;">'
-        f'<h4 style="margin:0 0 0.6rem 0;">{t("tut_video_title")}</h4>'
-        f'<p>{t("tut_video_body")}</p></div>')
+
+    # --- The Walkthrough video box has been completely removed here ---
 
     lang = st.session_state.get("lang", "en")
     tabs_data = TUTORIAL_TABS.get(lang, TUTORIAL_TABS["en"])
